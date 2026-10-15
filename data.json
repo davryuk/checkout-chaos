@@ -14,15 +14,19 @@
     "hair": "#3a2312"
    },
    "unlock": null,
-   "price": 0
+   "price": 0,
+   "costumes": [
+    "recep_gala"
+   ]
   },
   {
    "id": "house",
    "name": "Housekeeping",
    "weapon": "carrito",
-   "bonusText": "+0.5 HP/s regeneración",
+   "bonusText": "+0.5 HP/s regeneración · +25% curación",
    "bonus": {
-    "regen": 0.5
+    "regen": 0.5,
+    "heal": 1.25
    },
    "colors": {
     "uniform": "#2fa36b",
@@ -30,7 +34,10 @@
     "hair": "#111111"
    },
    "unlock": null,
-   "price": 0
+   "price": 0,
+   "costumes": [
+    "house_dorado"
+   ]
   },
   {
    "id": "botones",
@@ -46,11 +53,13 @@
     "hair": "#6b3b1a"
    },
    "unlock": {
-    "type": "survive",
-    "sec": 300,
+    "ach": "media_jornada",
     "text": "Sobreviví 5 min"
    },
-   "price": 60
+   "price": 60,
+   "costumes": [
+    "botones_gorra"
+   ]
   },
   {
    "id": "cocinero",
@@ -66,11 +75,212 @@
     "hair": "#d9a066"
    },
    "unlock": {
-    "type": "kills",
-    "n": 500,
+    "ach": "matanza",
     "text": "500 kills totales"
    },
-   "price": 120
+   "price": 120,
+   "costumes": [
+    "cocinero_gorro"
+   ]
+  },
+  {
+   "id": "mantenimiento",
+   "name": "Mantenimiento",
+   "weapon": "llave_inglesa",
+   "bonusText": "+2 armadura",
+   "bonus": {
+    "armor": 2
+   },
+   "colors": {
+    "uniform": "#4a6fa5",
+    "accent": "#f28c28",
+    "hair": "#3a2312"
+   },
+   "unlock": {
+    "ach": "temporada_alta",
+    "text": "Llegá a 12:00"
+   },
+   "price": 150,
+   "costumes": [
+    "mant_naranja"
+   ]
+  },
+  {
+   "id": "conserje",
+   "name": "Conserje Nocturno",
+   "weapon": "linterna",
+   "bonusText": "+15% XP",
+   "bonus": {
+    "xp": 1.15
+   },
+   "colors": {
+    "uniform": "#1d2340",
+    "accent": "#c9a227",
+    "hair": "#222"
+   },
+   "unlock": {
+    "ach": "inspeccion",
+    "text": "Vencé a La Inspección"
+   },
+   "price": 200,
+   "costumes": [
+    "conserje_sobretodo"
+   ]
+  },
+  {
+   "id": "chef",
+   "name": "Chef Ejecutivo",
+   "weapon": "cuchillos",
+   "bonusText": "-10% cooldown",
+   "bonus": {
+    "cd": 0.9
+   },
+   "colors": {
+    "uniform": "#1b1b1b",
+    "accent": "#ffffff",
+    "hair": "#ddd"
+   },
+   "unlock": {
+    "ach": "bateria",
+    "text": "Evolucioná la Sartén"
+   },
+   "price": 250,
+   "costumes": []
+  },
+  {
+   "id": "gerente",
+   "name": "Gerente General",
+   "weapon": "memo",
+   "bonusText": "+25% llaves",
+   "bonus": {
+    "keys": 1.25
+   },
+   "colors": {
+    "uniform": "#202a55",
+    "accent": "#b0001a",
+    "hair": "#555"
+   },
+   "unlock": {
+    "ach": "checkout",
+    "text": "Vencé al Dueño"
+   },
+   "price": 400,
+   "costumes": []
+  },
+  {
+   "id": "dueno",
+   "name": "Dueño del Hotel",
+   "weapon": "billetes",
+   "bonusText": "+30 vida máx",
+   "bonus": {
+    "hp": 30
+   },
+   "colors": {
+    "uniform": "#f0f0f0",
+    "accent": "#d4af37",
+    "hair": "#aaa"
+   },
+   "unlock": {
+    "ach": "tres_victorias",
+    "text": "Ganá 3 runs"
+   },
+   "price": 800,
+   "costumes": []
+  },
+  {
+   "id": "bartender",
+   "name": "Bartender",
+   "weapon": "botella",
+   "bonusText": "+10% daño",
+   "bonus": {
+    "dmg": 1.1
+   },
+   "colors": {
+    "uniform": "#222",
+    "accent": "#b0001a",
+    "hair": "#333"
+   },
+   "unlock": {
+    "text": "Comprar"
+   },
+   "price": 180,
+   "costumes": []
+  },
+  {
+   "id": "salvavidas",
+   "name": "Salvavidas",
+   "weapon": "silbato",
+   "bonusText": "+20 vida máx",
+   "bonus": {
+    "hp": 20
+   },
+   "colors": {
+    "uniform": "#e2483d",
+    "accent": "#fff",
+    "hair": "#d9a066"
+   },
+   "unlock": {
+    "text": "Comprar"
+   },
+   "price": 180,
+   "costumes": []
+  },
+  {
+   "id": "masajista",
+   "name": "Masajista",
+   "weapon": "piedras",
+   "bonusText": "+1 HP/s regeneración",
+   "bonus": {
+    "regen": 1.0
+   },
+   "colors": {
+    "uniform": "#e8e0d0",
+    "accent": "#7a9a7a",
+    "hair": "#222"
+   },
+   "unlock": {
+    "text": "Comprar"
+   },
+   "price": 220,
+   "costumes": []
+  },
+  {
+   "id": "seguridad",
+   "name": "Seguridad",
+   "weapon": "baston",
+   "bonusText": "+3 armadura",
+   "bonus": {
+    "armor": 3
+   },
+   "colors": {
+    "uniform": "#111",
+    "accent": "#ffd23f",
+    "hair": "#111"
+   },
+   "unlock": {
+    "text": "Comprar"
+   },
+   "price": 220,
+   "costumes": []
+  },
+  {
+   "id": "valet",
+   "name": "Valet",
+   "weapon": "auto",
+   "bonusText": "+15% velocidad",
+   "bonus": {
+    "speed": 1.15
+   },
+   "colors": {
+    "uniform": "#c4262e",
+    "accent": "#111",
+    "hair": "#3a2312"
+   },
+   "unlock": {
+    "text": "Comprar"
+   },
+   "price": 260,
+   "costumes": []
   }
  ],
  "weapons": {
@@ -97,7 +307,16 @@
     92,
     104,
     120
-   ]
+   ],
+   "type": "timbre",
+   "evo": {
+    "name": "Campana de Gerencia",
+    "spr": "evo_campana",
+    "mods": {
+     "dmg": 1.6,
+     "radius": 1.5
+    }
+   }
   },
   "carrito": {
    "name": "Carrito",
@@ -136,7 +355,17 @@
     5,
     5.5,
     6
-   ]
+   ],
+   "type": "carrito",
+   "evo": {
+    "name": "Carrito Turbo",
+    "spr": "evo_carrito",
+    "mods": {
+     "dmg": 1.5,
+     "speed": 1.4,
+     "count+": 2
+    }
+   }
   },
   "valija": {
    "name": "Valija Boomerang",
@@ -168,7 +397,17 @@
     180,
     195,
     215
-   ]
+   ],
+   "type": "valija",
+   "evo": {
+    "name": "Equipaje Perdido",
+    "spr": "evo_valija",
+    "mods": {
+     "dmg": 1.5,
+     "range": 1.3,
+     "count+": 2
+    }
+   }
   },
   "sarten": {
    "name": "Sartén Giratoria",
@@ -200,7 +439,17 @@
     3.7,
     4.0,
     4.4
-   ]
+   ],
+   "type": "sarten",
+   "evo": {
+    "name": "Batería de Cocina",
+    "spr": "evo_olla",
+    "mods": {
+     "dmg": 1.5,
+     "count+": 2,
+     "puddle": 1
+    }
+   }
   },
   "spray": {
    "name": "Spray Desinfectante",
@@ -225,7 +474,17 @@
     0.6,
     0.68,
     0.75
-   ]
+   ],
+   "type": "spray",
+   "evo": {
+    "name": "Fumigación Total",
+    "spr": "evo_nube",
+    "mods": {
+     "dps": 1.6,
+     "range": 1.4,
+     "angle360": 1
+    }
+   }
   },
   "tarjeta": {
    "name": "Tarjeta-Llave",
@@ -257,7 +516,351 @@
     340,
     350,
     370
-   ]
+   ],
+   "type": "tarjeta",
+   "evo": {
+    "name": "Llave Maestra",
+    "spr": "evo_llave",
+    "mods": {
+     "dmg": 1.6,
+     "count+": 3,
+     "pierce": 3
+    }
+   }
+  },
+  "llave_inglesa": {
+   "name": "Llave Inglesa",
+   "desc": "Arco que explota en área",
+   "type": "lob",
+   "cd": [
+    1.9,
+    1.8,
+    1.7,
+    1.55,
+    1.4
+   ],
+   "dmg": [
+    16,
+    20,
+    25,
+    31,
+    40
+   ],
+   "count": [
+    1,
+    1,
+    2,
+    2,
+    3
+   ],
+   "radius": [
+    34,
+    38,
+    42,
+    46,
+    52
+   ],
+   "requiresChar": "mantenimiento",
+   "spr": "wrench"
+  },
+  "linterna": {
+   "name": "Linterna",
+   "desc": "Haz giratorio",
+   "type": "beam",
+   "dps": [
+    22,
+    28,
+    35,
+    44,
+    56
+   ],
+   "range": [
+    90,
+    100,
+    110,
+    120,
+    135
+   ],
+   "angle": [
+    0.28,
+    0.3,
+    0.33,
+    0.36,
+    0.4
+   ],
+   "spin": [
+    1.6,
+    1.8,
+    2.0,
+    2.2,
+    2.5
+   ],
+   "requiresChar": "conserje"
+  },
+  "cuchillos": {
+   "name": "Cuchillos",
+   "desc": "Abanico frontal",
+   "type": "fan",
+   "cd": [
+    1.2,
+    1.1,
+    1.0,
+    0.9,
+    0.8
+   ],
+   "dmg": [
+    9,
+    11,
+    13,
+    16,
+    20
+   ],
+   "count": [
+    3,
+    3,
+    4,
+    5,
+    6
+   ],
+   "speed": [
+    300,
+    310,
+    320,
+    330,
+    350
+   ],
+   "requiresChar": "chef",
+   "spr": "cuchillo"
+  },
+  "memo": {
+   "name": "Memorándum",
+   "desc": "Teledirigido",
+   "type": "homing",
+   "cd": [
+    1.5,
+    1.4,
+    1.3,
+    1.2,
+    1.0
+   ],
+   "dmg": [
+    12,
+    15,
+    18,
+    22,
+    28
+   ],
+   "count": [
+    1,
+    2,
+    2,
+    3,
+    3
+   ],
+   "speed": [
+    170,
+    180,
+    190,
+    200,
+    215
+   ],
+   "requiresChar": "gerente",
+   "spr": "memo"
+  },
+  "billetes": {
+   "name": "Lluvia de Billetes",
+   "desc": "Golpes al azar en área",
+   "type": "strike",
+   "cd": [
+    1.6,
+    1.5,
+    1.4,
+    1.3,
+    1.1
+   ],
+   "dmg": [
+    20,
+    25,
+    31,
+    38,
+    48
+   ],
+   "count": [
+    2,
+    3,
+    3,
+    4,
+    5
+   ],
+   "radius": [
+    28,
+    30,
+    33,
+    36,
+    40
+   ],
+   "requiresChar": "dueno"
+  },
+  "botella": {
+   "name": "Botella Flameada",
+   "desc": "Arco que deja fuego en el piso",
+   "type": "lob",
+   "spr": "botella",
+   "fire": true,
+   "cd": [
+    2.0,
+    1.9,
+    1.8,
+    1.6,
+    1.4
+   ],
+   "dmg": [
+    12,
+    15,
+    19,
+    24,
+    30
+   ],
+   "count": [
+    1,
+    1,
+    2,
+    2,
+    3
+   ],
+   "radius": [
+    28,
+    30,
+    33,
+    36,
+    40
+   ],
+   "requiresChar": "bartender"
+  },
+  "silbato": {
+   "name": "Silbato",
+   "desc": "Onda que empuja fuerte",
+   "type": "timbre",
+   "sprFx": "onda_silbato",
+   "kb": 260,
+   "cd": [
+    2.0,
+    1.9,
+    1.8,
+    1.6,
+    1.4
+   ],
+   "dmg": [
+    8,
+    10,
+    13,
+    16,
+    20
+   ],
+   "radius": [
+    80,
+    90,
+    100,
+    112,
+    128
+   ],
+   "requiresChar": "salvavidas"
+  },
+  "piedras": {
+   "name": "Piedras Calientes",
+   "desc": "Teledirigidas, queman",
+   "type": "homing",
+   "spr": "piedra_caliente",
+   "cd": [
+    1.4,
+    1.3,
+    1.2,
+    1.1,
+    0.95
+   ],
+   "dmg": [
+    11,
+    14,
+    17,
+    21,
+    26
+   ],
+   "count": [
+    1,
+    2,
+    2,
+    3,
+    4
+   ],
+   "speed": [
+    160,
+    170,
+    180,
+    190,
+    205
+   ],
+   "requiresChar": "masajista"
+  },
+  "baston": {
+   "name": "Bastón",
+   "desc": "Barrido frontal cuerpo a cuerpo",
+   "type": "arc",
+   "cd": [
+    1.1,
+    1.0,
+    0.95,
+    0.85,
+    0.75
+   ],
+   "dmg": [
+    18,
+    23,
+    28,
+    35,
+    44
+   ],
+   "range": [
+    48,
+    52,
+    56,
+    60,
+    66
+   ],
+   "requiresChar": "seguridad"
+  },
+  "auto": {
+   "name": "Auto del Huésped",
+   "desc": "Atropella en línea recta, atraviesa",
+   "type": "car",
+   "cd": [
+    3.0,
+    2.8,
+    2.6,
+    2.4,
+    2.1
+   ],
+   "dmg": [
+    25,
+    32,
+    40,
+    50,
+    64
+   ],
+   "count": [
+    1,
+    1,
+    2,
+    2,
+    3
+   ],
+   "speed": [
+    260,
+    270,
+    280,
+    295,
+    315
+   ],
+   "requiresChar": "valet"
   }
  },
  "passives": {
@@ -330,26 +933,80 @@
   },
   "inspeccion": {
    "name": "La Inspección",
-   "hp": 6000,
+   "hp": 7000,
    "speed": 36,
    "dmg": 18,
    "xp": 0,
    "size": 28,
    "behavior": "boss",
-   "keys": 15
+   "keys": 15,
+   "miniboss": true
+  },
+  "mucama": {
+   "name": "Mucama Fantasma",
+   "hp": 40,
+   "speed": 85,
+   "dmg": 9,
+   "xp": 3,
+   "size": 12,
+   "behavior": "ghost"
+  },
+  "abogado": {
+   "name": "Abogado",
+   "hp": 500,
+   "speed": 55,
+   "dmg": 14,
+   "xp": 15,
+   "size": 14,
+   "behavior": "chase",
+   "elite": true,
+   "keys": 2
+  },
+  "dueno": {
+   "name": "Dueño del Hotel",
+   "hp": 20000,
+   "speed": 40,
+   "dmg": 30,
+   "xp": 0,
+   "size": 26,
+   "behavior": "dueno",
+   "keys": 40
   }
  },
  "timeline": {
-  "bossAt": 570,
-  "runLength": 600,
+  "runLength": 900,
+  "inspAt": 600,
+  "highSeason": 600,
+  "hsHp": 1.6,
+  "hsSpeed": 1.15,
   "firstElite": 180,
   "eliteEvery": 60,
+  "eliteEveryHS": 40,
   "eliteRegularFrom": 360,
   "congaFrom": 360,
   "congaEvery": 18,
+  "congaEveryLate": 30,
   "congaSize": 3,
+  "congaMax": 4,
+  "lateFrom": 720,
+  "breathFrom": 840,
+  "breathTo": 855,
+  "dueAt": 900,
   "maxEnemies": 420,
-  "congaMax": 4
+  "dueno": {
+   "phase2": 0.66,
+   "phase3": 0.3,
+   "spiralEvery": 0.09,
+   "spiralEvery2": 0.18,
+   "bulletSpeed": 120,
+   "bulletDmg": 12,
+   "summonEvery": 10,
+   "summonCount": 4,
+   "telegraph": 1.0,
+   "dashTime": 0.7,
+   "dashSpeed": 380,
+   "rest": 1.5
+  }
  },
  "shop": [
   {
@@ -382,6 +1039,247 @@
     45,
     80
    ]
+  }
+ ],
+ "food": {
+  "chance": {
+   "normal": 0.02,
+   "elite": 0.35,
+   "despedida": 0.01,
+   "boss": 1.0
+  },
+  "weights": {
+   "normal": [
+    50,
+    30,
+    15,
+    5
+   ],
+   "elite": [
+    0,
+    40,
+    40,
+    20
+   ]
+  },
+  "order": [
+   "caramelo",
+   "medialuna",
+   "club",
+   "pizza"
+  ],
+  "items": {
+   "caramelo": {
+    "name": "Caramelo",
+    "heal": 0.05
+   },
+   "medialuna": {
+    "name": "Medialuna",
+    "heal": 0.15
+   },
+   "club": {
+    "name": "Club Sándwich",
+    "heal": 0.3
+   },
+   "pizza": {
+    "name": "Pizza",
+    "heal": 0.5
+   },
+   "buffet": {
+    "name": "Buffet",
+    "heal": 1.0,
+    "magnet": 5
+   }
+  },
+  "maxOnScreen": 6,
+  "despawn": 20
+ },
+ "costumes": {
+  "recep_gala": {
+   "char": "recep",
+   "name": "Gala"
+  },
+  "house_dorado": {
+   "char": "house",
+   "name": "Delantal Dorado"
+  },
+  "botones_gorra": {
+   "char": "botones",
+   "name": "Gorra Roja"
+  },
+  "cocinero_gorro": {
+   "char": "cocinero",
+   "name": "Gorro Alto"
+  },
+  "mant_naranja": {
+   "char": "mantenimiento",
+   "name": "Mameluco Naranja"
+  },
+  "conserje_sobretodo": {
+   "char": "conserje",
+   "name": "Sobretodo Largo"
+  }
+ },
+ "achievements": [
+  {
+   "id": "primer_turno",
+   "name": "Primer Turno",
+   "desc": "Sobreviví 1 minuto",
+   "cond": {
+    "surviveSec": 60
+   },
+   "reward": {
+    "keys": 5
+   }
+  },
+  {
+   "id": "media_jornada",
+   "name": "Media Jornada",
+   "desc": "Sobreviví 5 minutos",
+   "cond": {
+    "surviveSec": 300
+   },
+   "reward": {
+    "unlock": "botones",
+    "costume": "recep_gala"
+   }
+  },
+  {
+   "id": "inspeccion",
+   "name": "Inspección Aprobada",
+   "desc": "Vencé a La Inspección",
+   "cond": {
+    "kill": "inspeccion"
+   },
+   "reward": {
+    "unlock": "conserje",
+    "keys": 15
+   }
+  },
+  {
+   "id": "temporada_alta",
+   "name": "Temporada Alta",
+   "desc": "Llegá a 12:00",
+   "cond": {
+    "surviveSec": 720
+   },
+   "reward": {
+    "unlock": "mantenimiento"
+   }
+  },
+  {
+   "id": "checkout",
+   "name": "Check-Out",
+   "desc": "Vencé al Dueño del Hotel",
+   "cond": {
+    "win": 1
+   },
+   "reward": {
+    "unlock": "gerente",
+    "keys": 50
+   }
+  },
+  {
+   "id": "matanza",
+   "name": "Overbooking",
+   "desc": "500 kills totales",
+   "cond": {
+    "totalKills": 500
+   },
+   "reward": {
+    "unlock": "cocinero"
+   }
+  },
+  {
+   "id": "masacre",
+   "name": "Lobby Despejado",
+   "desc": "1000 kills en una run",
+   "cond": {
+    "runKills": 1000
+   },
+   "reward": {
+    "costume": "botones_gorra",
+    "keys": 20
+   }
+  },
+  {
+   "id": "evolucion",
+   "name": "Ascenso",
+   "desc": "Evolucioná un arma",
+   "cond": {
+    "evolveAny": 1
+   },
+   "reward": {
+    "costume": "cocinero_gorro",
+    "keys": 10
+   }
+  },
+  {
+   "id": "bateria",
+   "name": "Batería Completa",
+   "desc": "Evolucioná la Sartén",
+   "cond": {
+    "evolve": "sarten"
+   },
+   "reward": {
+    "unlock": "chef"
+   }
+  },
+  {
+   "id": "buffet",
+   "name": "Libre",
+   "desc": "Comé un Buffet",
+   "cond": {
+    "eat": "buffet"
+   },
+   "reward": {
+    "costume": "house_dorado"
+   }
+  },
+  {
+   "id": "karens",
+   "name": "Atención al Cliente",
+   "desc": "Vencé 25 Karens (total)",
+   "cond": {
+    "karens": 25
+   },
+   "reward": {
+    "keys": 15
+   }
+  },
+  {
+   "id": "noche_larga",
+   "name": "Noche Larga",
+   "desc": "Ganá con el Conserje Nocturno",
+   "cond": {
+    "winAs": "conserje"
+   },
+   "reward": {
+    "costume": "conserje_sobretodo"
+   }
+  },
+  {
+   "id": "arsenal",
+   "name": "Arsenal Completo",
+   "desc": "4 armas y 4 pasivos en una run",
+   "cond": {
+    "fullBuild": 1
+   },
+   "reward": {
+    "costume": "mant_naranja"
+   }
+  },
+  {
+   "id": "tres_victorias",
+   "name": "Cadena Hotelera",
+   "desc": "Ganá 3 runs",
+   "cond": {
+    "wins": 3
+   },
+   "reward": {
+    "unlock": "dueno",
+    "keys": 30
+   }
   }
  ]
 }

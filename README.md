@@ -49,3 +49,9 @@ Ej.: `index.html?t=565&speed=4&god=1&dmg=6` → jefe + victoria en ~15 s reales.
 
 ## Co-op (base)
 `G.players[]` (hoy 1); `G.p` = alias a `players[0]`. Input como datos: `readInput(slot)` → `{mx,my}` en `player.input`; el render solo lee estado. Pendiente para co-op: armas/XP por jugador, cámara compartida, targeting de enemigos al jugador más cercano.
+
+## v2 (15 min)
+- 0-10 igual que v1; 10:00 La Inspección = mini-jefe. 10-15 Temporada Alta (+60% HP, +15% vel, élites c/40s); 12:00 Karens de a pares, Despedidas c/30s, Mucama Fantasma; 14:00-14:15 respiro; 15:00 Dueño del Hotel (espiral de billetes → 4 Abogados → <30% embestida con aviso 1s). Vencerlo = victoria.
+- Comida curativa, evoluciones automáticas a nivel 5, 14 logros (trajes/llaves/desbloqueos, pantalla `L`, traje `T`), 14 personajes. Save v2 en `checkoutChaos.meta.v2`, migra el v1 sin borrarlo.
+- Todo el balance en `data.json`; `python3 build_sprites.py` regenera `sprites.js` y `data.js`.
+- Test full run: `index.html?speed=12&god=1&dmg=8`.

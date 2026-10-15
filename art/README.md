@@ -24,3 +24,67 @@ Wiring: `ctx.drawImage(img, frame*FS, 0, FS, FS, x-FS/2, y-FS/2, FS*SC, FS*SC)` 
 Mapping to current SPR keys: e_apurado→enemy_huesped_apurado, e_valija→enemy_turista_valija, e_karen→enemy_karen, e_queja→enemy_queja_voladora, e_despedida→enemy_grupo_despedida, e_inspeccion→boss_inspeccion; players recep/house/botones/cocinero → player_*.
 
 Also: palette.png + PALETTE.md (31 colors), preview_x4.png (all frames x4 on the lobby floor checker #3B2F45/#463852).
+
+## Foot anchor (all units)
+Anchor = pixel (x,y) inside one frame where the feet touch the ground; draw at `x_world - ax*SC, y_world - ay*SC`.
+- 32x32 humans (all player_*, costumes, enemy_huesped_apurado, enemy_turista_valija, enemy_karen, elite_abogado): **(16, 29)** (lowest shoe row; outline is at y=30).
+- enemy_grupo_despedida: **(16, 30)**.
+- Flyers/floaters (enemy_queja_voladora, enemy_mucama_fantasma): no feet; shadow/ground anchor **(16, 30)**.
+- 64x64 bosses (boss_inspeccion, boss_dueno_hotel): **(32, 59)**.
+- Food, projectiles, evolutions: center anchor (8,8) for 16px, (16,16) for 32px; proj_charco_aceite sits on the ground at (16,18).
+
+## v2 assets
+Layout: every sheet is one horizontal row of frames of size FS.
+Humans: 6 frames `idle0 idle1 walk0 walk1 walk2 walk3`. Single sprites: 1 frame. Projectiles: 2 frames (spin/wobble, ~8 fps).
+**boss_dueno_hotel: single row, 7 frames of 64x64 (448x64): `0 idle0, 1 idle1, 2 atk0 (raise moneybag), 3 atk1, 4 atk2 (throw), 5 dash0, 6 dash1` (speed lines).**
+
+| file | FS | frames | suggested SPR key |
+|---|---|---|---|
+| food_caramelo.png | 16 | 1 | food_caramelo |
+| food_medialuna.png | 16 | 1 | food_medialuna |
+| food_club_sandwich.png | 16 | 1 | food_club |
+| food_pizza.png | 16 | 1 | food_pizza |
+| food_buffet.png | 16 | 1 | food_buffet (cloche tray) |
+| proj_billete.png | 16 | 2 | billete (replaces tarjeta-style bill shots) |
+| proj_charco_aceite.png | 32 | 2 | charco (replaces sarten puddle) |
+| proj_cuchillo.png | 16 | 2 | cuchillo |
+| proj_memo.png | 16 | 2 | memo (replaces checklist) |
+| evo_campana_grande.png | 32 | 1 | evo_campana |
+| evo_carrito_turbo.png | 32 | 1 | evo_carrito (evolves SPR.carrito) |
+| evo_valija_dorada.png | 32 | 1 | evo_valija (evolves SPR.valija) |
+| evo_olla.png | 32 | 1 | evo_olla (evolves SPR.sarten) |
+| evo_nube_verde.png | 32 | 1 | evo_nube |
+| evo_llave_maestra.png | 32 | 1 | evo_llave (evolves SPR.key) |
+| player_chef_ejecutivo.png | 32 | 6 | p_chef_ejecutivo |
+| player_gerente_general.png | 32 | 6 | p_gerente |
+| player_dueno_hotel.png | 32 | 6 | p_dueno (playable, cane, friendly) |
+| elite_abogado.png | 32 | 6 | e_abogado (elite) |
+| enemy_mucama_fantasma.png | 32 | 6 | e_mucama_fantasma |
+| boss_dueno_hotel.png | 64 | 7 | e_dueno (final boss) |
+| player_recepcionista_gala.png | 32 | 6 | costume recep_gala |
+| player_housekeeping_delantal_dorado.png | 32 | 6 | costume house_dorado |
+| player_botones_gorra_roja.png | 32 | 6 | costume botones_gorra |
+| player_cocinero_gorro_alto.png | 32 | 6 | costume cocinero_gorro |
+| player_mantenimiento_mameluco_naranja.png | 32 | 6 | costume mant_naranja |
+| player_conserje_sobretodo_largo.png | 32 | 6 | costume conserje_sobretodo |
+
+Preview: preview_v2_x4.png. Palette: unchanged (no colors added).
+
+## v3 assets
+Same row layout. Characters: 6 frames `idle0 idle1 walk0 walk1 walk2 walk3`, foot anchor **(16,29)**. FX/projectiles: 2 frames (~8 fps).
+
+| file | frame | frames | suggested SPR key | anchor |
+|---|---|---|---|---|
+| player_bartender.png | 32x32 | 6 | p_bartender | (16,29) |
+| player_salvavidas.png | 32x32 | 6 | p_salvavidas | (16,29) |
+| player_masajista.png | 32x32 | 6 | p_masajista | (16,29) |
+| player_seguridad.png | 32x32 | 6 | p_seguridad | (16,29) |
+| player_valet.png | 32x32 | 6 | p_valet | (16,29) |
+| proj_botella.png | 16x16 | 2 (upright/sideways spin) | botella | center (8,8) |
+| fx_llama_piso.png | 32x32 | 2 flicker | llama_piso | ground (16,27) |
+| fx_onda_silbato.png | 32x32 | 2 (small ring -> big ring; can also scale in code) | onda_silbato | center (16,16) |
+| proj_piedra_caliente.png | 16x16 | 2 (frame 1 = red glow) | piedra_caliente | center (8,8) |
+| fx_arco_baston.png | 32x32 | 2 (arc start -> follow-through, swinging clockwise from left-up) | arco_baston | pivot = player center (16,16) |
+| proj_auto.png | **48x24** | 2 (wheel spin + exhaust puff) | auto | center (24,12); faces right (+x), rotate to heading |
+
+Preview: preview_v3_x4.png. Palette unchanged.
