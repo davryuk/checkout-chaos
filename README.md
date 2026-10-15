@@ -55,3 +55,9 @@ Ej.: `index.html?t=565&speed=4&god=1&dmg=6` → jefe + victoria en ~15 s reales.
 - Comida curativa, evoluciones automáticas a nivel 5, 14 logros (trajes/llaves/desbloqueos, pantalla `L`, traje `T`), 14 personajes. Save v2 en `checkoutChaos.meta.v2`, migra el v1 sin borrarlo.
 - Todo el balance en `data.json`; `python3 build_sprites.py` regenera `sprites.js` y `data.js`.
 - Test full run: `index.html?speed=12&god=1&dmg=8`.
+
+## v3
+- Armas nv1-8 (nv2 efecto A, nv4 efecto B, nv5 evolución automática, nv6 +25% daño, nv7 +1 proyectil/+20% área, nv8 maestría -20% cd). 22 armas, todas con evolución. 16 pasivos nv1-5.
+- Slots 4+4 → 8+8 (se abren a nv 10/18/26/34). 4 opciones por level-up (Gerente 5), 2 rerolls + 1 descarte (`X`). XP +30% desde min 10, Despedidas x5. Cofres de élite (20% x3).
+- Fusiones: arma evolucionada nv8 + pasivo nv5 (raras: 2 evoluciones nv8) → cofre violeta → FUSIONAR/NO. 15 normales + 4 raras, máx 3 por run, 1 rara. Libro de Recetas (`B` en el menú). Save v3 (migra v1/v2).
+- `python3 build_sprites.py` incluye automáticamente todo PNG nuevo de art/ (clave = nombre de archivo).
