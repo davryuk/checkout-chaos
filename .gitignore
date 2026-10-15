@@ -1,0 +1,5 @@
+node_modules/
+*.png.tmp
+screenshot*.png
+__pycache__/
+.DS_Store
