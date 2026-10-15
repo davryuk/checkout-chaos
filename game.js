@@ -199,7 +199,7 @@ const TLd = () => D.timeline;
 function newRun(charId) {
   const ch = D.characters.find(c => c.id === charId); const b = ch.bonus || {};
   G = { state: 'play', t: DBG.t, kills: 0, karens: 0, keys: 0, lvl: 1, xp: 0, xpNext: 5, char: ch, weapons: [], passives: [], boss: null, mini: null, inspSpawned: false, duenoSpawned: false,
-    nextElite: TLd().firstElite, nextConga: TLd().congaFrom, spawnAcc: 0, rerolls: D.run.rerolls + META.shop.reroll, banishLeft: D.run.banish + (META.shop.banish || 0), banished: {}, banishMode: false, choices: null, chestsOpened: 0, mastered: [], pulse: 0, unlockedNow: [], achNow: [], shake: 0,
+    nextElite: TLd().firstElite, nextConga: TLd().congaFrom, spawnAcc: 0, rerolls: D.run.rerolls + META.shop.reroll, banishLeft: D.run.banish + (META.shop.banish || 0), banished: {}, banishMode: false, choices: null, chestsOpened: 0, mastered: [], fusions: [], fusionOpts: null, trail: [], dark: 0, pulse: 0, unlockedNow: [], achNow: [], shake: 0,
     evolved: [], ate: {}, minHpFrac: 1, revived: false, trailT: 0, duenoT: null, killed: {}, magnetT: 0, committed: false,
     players: [{ id: 0, inputSlot: 0, charId: ch.id, costume: META.costumeSel[ch.id] || null, anim: 0, input: { mx: 0, my: 0 }, x: 0, y: 0, hp: 0,
       baseMaxHp: 120 + 10 * META.shop.hp + (b.hp || 0), maxHp: 120 + 10 * META.shop.hp + (b.hp || 0), baseRegen: b.regen || 0, basePickup: 40 * (b.pickup || 1), baseDmg: (b.dmg || 1) * (1 + 0.05 * META.shop.dmg) * DBG.dmg, speed: 95, regen: b.regen || 0, armor: 0, pickup: 40 * (b.pickup || 1), heal: b.heal || 1, keyMul: b.keys || 1,
@@ -329,12 +329,13 @@ function damage(e, amt, key, kb = 0, sx, sy) {
   if (!e.alive) return; if (key) { if (e.hits[key] === G.pulse) return; e.hits[key] = G.pulse; }
   const P = G.p, S = CURS, big = e.d.behavior === 'boss' || e.d.behavior === 'dueno';
   amt *= P.dmg; if (e.d.elite || big) amt *= P.eliteDmg * (S && S.eliteDmg ? S.eliteDmg : 1);
-  let crit = false; if (P.luck > 0 && Math.random() < P.luck) { amt *= D.run.critMul; crit = true; }
+  let crit = false; if ((S && S.crit) || (P.luck > 0 && Math.random() < P.luck)) { amt *= D.run.critMul; crit = true; }
+  if (e.stunT > 0 && G.frozenMul) amt *= G.frozenMul;
   e.hp -= amt; e.flash = 0.08;
   if (S) { if (S.slow) { e.slowT = 1.5; e.slowF = Math.max(e.slowF, S.slow); } if (S.stun && !big) e.stunT = Math.max(e.stunT, S.stun); if (S.freeze && !big) e.stunT = Math.max(e.stunT, S.freeze); if (S.burn) { e.burnT = 2 * P.dur; e.burnDps = Math.max(e.burnDps, S.burn); } }
   if (kb && !big && e.st !== 'dash') { const ox = sx ?? P.x, oy = sy ?? P.y, dx = e.x - ox, dy = e.y - oy, d = Math.hypot(dx, dy) || 1; e.kb = 0.12; e.kbx = dx / d * kb * (e.d.elite ? 0.4 : 1); e.kby = dy / d * kb * (e.d.elite ? 0.4 : 1); }
   if (amt >= 1 && (crit || Math.random() < 0.3)) { const f = FX.get(); if (f) Object.assign(f, { kind: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 10, t: 0, dur: 0.5, v: Math.round(amt) + (crit ? '!' : ''), col: crit ? '#ffd23f' : null, vx: 0 }); }
-  sfx('hit'); if (e.hp <= 0) { if (S && S.healOnKill) P.hp = Math.min(P.maxHp, P.hp + S.healOnKill); kill(e); }
+  sfx('hit'); if (e.hp <= 0) { if (S && S.healOnKill) P.hp = Math.min(P.maxHp, P.hp + S.healOnKill); if (S && S.chestOnKill && Math.random() < S.chestOnKill) drop('chest', e.x, e.y, 1); kill(e); }
 }
 function foodCount() { let c = 0; for (const k of PICK.items) if (k.alive && k.food) c++; return c; }
 function dropFood(e) { const F = D.food, d = e.d; const big = d.behavior === 'boss' || d.behavior === 'dueno';
@@ -346,7 +347,7 @@ function dropFood(e) { const F = D.food, d = e.d; const big = d.behavior === 'bo
 function kill(e) {
   e.alive = false; G.kills++; sfx('die'); G.killed[e.type] = (G.killed[e.type] || 0) + 1; if (e.type === 'karen') G.karens++;
   const f = FX.get(); if (f) Object.assign(f, { kind: 'poof', x: e.x, y: e.y, t: 0, dur: 0.3, vx: 0 });
-  const d = e.d; const xv = d.xp * (e.type === 'despedida' ? D.run.despedidaXpMul : 1); if (xv) drop(xv >= 5 ? 'tipBig' : 'tip', e.x, e.y, xv);
+  const d = e.d; const xv = d.xp * (e.type === 'despedida' ? D.run.despedidaXpMul : 1) * (G.spaR && dist2(e, G.p) < G.spaR * G.spaR ? G.spaXp : 1); if (xv) drop(xv >= 5 ? 'tipBig' : 'tip', e.x, e.y, xv);
   if (G.p.lifesteal && Math.random() < G.p.lifesteal) G.p.hp = Math.min(G.p.maxHp, G.p.hp + 1);
   if ((d.elite || e.type === 'inspeccion') && Math.random() < D.run.chest.eliteChance) drop('chest', e.x, e.y, 1);
   const k = d.keys || (Math.random() < 0.012 * (1 + G.p.luck * 4) ? 1 : 0); for (let i = 0; i < k; i++) drop('key', e.x + rnd(-14, 14), e.y + rnd(-14, 14), 1);
@@ -376,7 +377,7 @@ function enemiesUpdate(dt) {
     const big = d.behavior === 'boss' || d.behavior === 'dueno';
     if (!d.elite && !big && d.behavior !== 'line' && dist2(e, P) > (W + H) ** 2) { const p = edgePos(); e.x = p.x; e.y = p.y; }
     const rr = e.r + PLAYER_R - 3;
-    if (dist2(e, P) < rr * rr) { hurt(d.dmg * (1 + Math.min(G.t, 900) / 600)); if (d.push) { const dx = P.x - e.x, dy = P.y - e.y, dd = Math.hypot(dx, dy) || 1; P.kbx = dx / dd * d.push; P.kby = dy / dd * d.push; } }
+    if (dist2(e, P) < rr * rr && !(G.quarR && dist2(e, P) < G.quarR * G.quarR)) { hurt(d.dmg * (1 + Math.min(G.t, 900) / 600)); if (d.push) { const dx = P.x - e.x, dy = P.y - e.y, dd = Math.hypot(dx, dy) || 1; P.kbx = dx / dd * d.push; P.kby = dy / dd * d.push; } }
   }
   const arr = ENE.items, off = Math.floor(G.t * 60); for (let i = 0; i < arr.length; i++) { const a = arr[i]; if (!a.alive || a.d.behavior === 'line' || a.d.behavior === 'ghost') continue; const b = arr[(i * 7 + off) % arr.length];
     if (b !== a && b.alive && b.d.behavior !== 'line' && b.d.behavior !== 'ghost') { const dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy, m = a.r + b.r; if (d2 < m * m && d2 > 0.01) { const d = Math.sqrt(d2), push = (m - d) / 2; a.x += dx / d * push; a.y += dy / d * push; b.x -= dx / d * push; b.y -= dy / d * push; } } }
@@ -419,11 +420,45 @@ function projUpdate(dt) {
     if (p.team === 1) { if (dist2(p, P) < (p.r + PLAYER_R) ** 2) { hurt(p.dmg); p.alive = false; } else if (dist2(p, P) > (W * 1.2) ** 2) p.alive = false; continue; }
     for (const e of ENE.items) { if (!e.alive) continue; if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (e.r + p.r) ** 2) {
       const id = 'p' + PROJ.items.indexOf(p); if (e.hits[id] > G.t) continue; e.hits[id] = G.t + (p.hitCd || 99);
-      damage(e, p.dmg, null, p.w === 'tarjeta' ? 40 : 90, p.x, p.y); if (p.explode) explodeAt(p.x, p.y, p.explode, p.dmg * 0.6, p.S, p.S && p.S.chain ? 3 : 0);
+      damage(e, p.dmg, null, p.w === 'tarjeta' ? 40 : 90, p.x, p.y); if (p.healHit) G.p.hp = Math.min(G.p.maxHp, G.p.hp + p.healHit); if (p.explode) explodeAt(p.x, p.y, p.explode, p.dmg * 0.6, p.S, p.S && p.S.chain ? 3 : 0);
       if (p.foodOnHit && Math.random() < p.foodOnHit && foodCount() < D.food.maxOnScreen) { const q = PICK.get(); if (q) Object.assign(q, { kind: 'food_caramelo', food: 'caramelo', x: p.x, y: p.y, v: 0, mag: false, life: D.food.despawn }); } p.pierce--; if (p.pierce <= 0) { p.alive = false; break; } } }
   }
 }
+function fusionsUpdate(dt) { const P = G.p; G.frozenMul = 0; G.spaR = 0; G.quarR = 0; if (G.dark > 0) G.dark -= dt;
+  G.trail.unshift({ x: P.x, y: P.y }); if (G.trail.length > 120) G.trail.length = 120;
+  for (const F of G.fusions) { const f = D.fusions.find(x => x.id === F.id), Q = f.params, st = F.st; F.t += dt; CURS = { healOnKill: Q.healOnKill, chestOnKill: Q.chestOnKill };
+    const every = (k, s) => { st[k] = (st[k] ?? 0) - dt; if (st[k] <= 0) { st[k] = s; return true; } return false; };
+    const hitCircle = (x, y, R, dmg, key, cd, kb) => { for (const e of ENE.items) if (e.alive && (e.x - x) ** 2 + (e.y - y) ** 2 < (R + e.r) ** 2) { if (key) { if (e.hits[key] > G.t) continue; e.hits[key] = G.t + cd; } damage(e, dmg, null, kb || 0, x, y); } };
+    switch (f.id) {
+      case 'recepcion24': if (every('drop', Q.every)) { st.list.push({ x: P.x, y: P.y, t: 0 }); if (st.list.length > Q.max) st.list.shift(); }
+        for (const b of st.list) { b.t -= dt; if (b.t <= 0) { b.t = Q.pulse; b.ring = 0.35; hitCircle(b.x, b.y, Q.R * P.area, Q.dmg, null, 0, 80); } b.ring -= dt; } break;
+      case 'tren': st.list = []; for (let i = 1; i <= Q.n; i++) { const q = G.trail[Math.min(G.trail.length - 1, i * Q.gap / 2)] || P; st.list.push(q); hitCircle(q.x, q.y, 12, Q.dmg, 'tren' + i, Q.hitCd, 100); } break;
+      case 'cinta': st.a = (st.a || 0) + Q.spin * dt; st.list = []; for (let i = 0; i < Q.n; i++) { const a = st.a + i * Math.PI * 2 / Q.n, x = P.x + Math.cos(a) * Q.R * P.area, y = P.y + Math.sin(a) * Q.R * P.area; st.list.push({ x, y, a }); hitCircle(x, y, 12, Q.dmg, 'cinta' + i, Q.hitCd, 120); } break;
+      case 'cocina': for (const e of ENE.items) if (e.alive && dist2(e, P) < (Q.R * P.area) ** 2) damage(e, Q.dps * dt, null, 0); break;
+      case 'cuarentena': G.quarR = Q.R * P.area; for (const e of ENE.items) if (e.alive && dist2(e, P) < G.quarR ** 2) { e.hp -= e.maxHp * Q.pctPerSec * dt * (e.d.behavior === 'dueno' || e.d.behavior === 'boss' ? 0.2 : 1); if (e.hp <= 0) kill(e); } break;
+      case 'seguridad': if (every('d', Q.every)) { const a = Math.atan2(P.fy, P.fx); for (let i = 1; i <= Q.n; i++) { const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'door', x: P.x + Math.cos(a) * i * Q.gap, y: P.y + Math.sin(a) * i * Q.gap, t: -i * 0.05, dur: 0.6, done: false, R: Q.R, dmg: Q.dmg, S: { crit: true }, vx: 0 }); } } break;
+      case 'terraza': if (P.moving && every('f', Q.every)) { const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'fire', big: true, S: null, x: P.x, y: P.y + 6, t: 0, dur: Q.dur, dps: P.speed * Q.dpsPerSpeed, R: Q.R, vx: 0 }); } break;
+      case 'evacuacion': if (every('e', Q.every)) { G.shake = 0.3; for (const e of ENE.items) if (e.alive && e.d.behavior !== 'dueno' && e.d.behavior !== 'boss') { const a = Math.atan2(e.y - P.y, e.x - P.x); const Rr = Math.hypot(W, H) / 2 + 10; e.x = P.x + Math.cos(a) * Rr; e.y = P.y + Math.sin(a) * Rr; damage(e, Q.dmg, null, 0); } const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'ring', x: P.x, y: P.y, t: 0, dur: 0.5, r: W / 2, evo: true, spr: 'fx_alarma_onda', vx: 0 }); } break;
+      case 'spa': G.spaR = Q.R * P.area; G.spaXp = Q.xpMul; for (const e of ENE.items) if (e.alive && dist2(e, P) < G.spaR ** 2) damage(e, Q.dps * dt, null, 0); break;
+      case 'valetvip': if (every('v', Q.every)) { const b = Math.random() * 6.28; for (let i = 0; i < Q.n; i++) { const a = b + i * Math.PI * 2 / Q.n; fireProj({ w: 'fus', S: null, spr: 'fus_limusina_vip', x: P.x - Math.cos(a) * 200, y: P.y - Math.sin(a) * 200, vx: Math.cos(a) * Q.speed, vy: Math.sin(a) * Q.speed, dmg: Q.dmg, life: 2.5, r: 16, pierce: 999, hitCd: 1, ang: a, rotTo: true }); } } break;
+      case 'inventario': if (every('i', Q.every)) { st.marked = ENE.items.filter(e => e.alive && Math.abs(e.x - P.x) < W / 2 && Math.abs(e.y - P.y) < H / 2); st.boom = Q.delay; }
+        if (st.boom > 0) { st.boom -= dt; if (st.boom <= 0) { for (const e of st.marked) if (e.alive) { damage(e, Q.dmg, null, 0); const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'xpl', S: { chain: 1 }, x: e.x, y: e.y, t: 0, dur: 0.3, r: 18, vx: 0 }); } st.marked = []; G.shake = 0.2; } } break;
+      case 'blackfriday': if (every('b', Q.every)) { const x = P.x + rnd(-W / 2, W / 2), y = P.y + rnd(-H / 2, H / 2), fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'strike', S: { chestOnKill: Q.chestOnKill }, spr: 'proj_billete_dorado', x, y, t: 0, dur: 0.45, R: Q.R, dmg: Q.dmg, done: false, tip: 1, vx: 0 }); } break;
+      case 'glaciar': G.frozenMul = Q.frozenDmgMul; if (every('g', Q.freezeEvery)) for (const e of ENE.items) if (e.alive && e.d.behavior !== 'dueno' && dist2(e, P) < (Q.R * P.area) ** 2) e.stunT = Math.max(e.stunT, Q.freeze); break;
+      case 'torre': st.a = (st.a || 0) + 1.1 * dt; st.list = []; for (let i = 0; i < Q.n; i++) { const a = st.a + i * Math.PI * 2 / Q.n; st.list.push({ x: P.x + Math.cos(a) * Q.R, y: P.y + Math.sin(a) * Q.R * 0.7 }); }
+        if (every('s', Q.cd)) for (const q of st.list) { const t = nearestEnemy(260, q); if (t) { const a = Math.atan2(t.y - q.y, t.x - q.x); fireProj({ w: 'fus', S: null, spr: 'proj_misil', x: q.x, y: q.y, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, dmg: Q.dmg, life: 1.2, r: 4, pierce: 1, ang: a, rotTo: true, explode: 18 }); } }
+        for (const k of PICK.items) if (k.alive && !k.food && k.kind !== 'chest') k.mag = true; break;
+      case 'desayuno': if (every('t', Q.cd)) for (let i = 0; i < Q.n; i++) { const a = Math.random() * 6.28; fireProj({ w: 'fus', S: null, spr: 'proj_bandeja_dorada', x: P.x, y: P.y, vx: Math.cos(a) * Q.speed, vy: Math.sin(a) * Q.speed, dmg: Q.dmg, life: 5, r: 9, hitCd: 0.5, bounce: true, spin: 10, foodOnHit: Q.food, healHit: Q.heal }); } break;
+      case 'banquete': st.a = (st.a || 0) + 4 * dt; if (every('k', Q.every)) { const a = st.a; fireProj({ w: 'fus', S: { healOnKill: Q.healOnKill }, spr: 'cuchillo', x: P.x, y: P.y, vx: Math.cos(a) * Q.speed, vy: Math.sin(a) * Q.speed, dmg: Q.dmg, life: 1.4, r: 5, pierce: 2, ang: a, rotTo: true }); } break;
+      case 'apagon': if (every('a', Q.every)) G.dark = Q.dur; if (G.dark > 0) for (const e of ENE.items) if (e.alive && dist2(e, P) > (Q.R * P.area) ** 2) { const big = e.d.behavior === 'dueno' || e.d.behavior === 'boss'; damage(e, (big ? Q.bossDps : Q.dps) * dt, null, 0); } break;
+      case 'checkout': if (every('c', Q.every)) { const vis = ENE.items.filter(e => e.alive && !e.d.elite && e.d.behavior !== 'dueno' && e.d.behavior !== 'boss' && Math.abs(e.x - P.x) < W / 2 && Math.abs(e.y - P.y) < H / 2);
+        const n = Math.floor(vis.length * Q.pct); for (let i = 0; i < n; i++) { const e = vis.splice(Math.floor(Math.random() * vis.length), 1)[0]; const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'poof', x: e.x, y: e.y, t: 0, dur: 0.4, vx: 0 }); kill(e); } G.banner = { s: 'CHECK-OUT FORZADO: -' + n, t: 1.2 }; } break;
+      case 'tsunami': if (every('w', Q.every)) { st.wx = P.x - W / 2 - 40; st.on = true; }
+        if (st.on) { st.wx += Q.speed * dt; for (const e of ENE.items) if (e.alive && Math.abs(e.x - st.wx) < 20 && Math.abs(e.y - P.y) < H / 2) { if (e.hits.tsu === F.t) continue; if (!(e.hits.tsuW > G.t)) { e.hits.tsuW = G.t + 3; damage(e, Q.dmg, null, 0); e.kb = 0.2; e.kbx = Q.kb; e.kby = 0; } } if (st.wx > P.x + W / 2 + 40) st.on = false; } break;
+    } }
+  CURS = null; }
 function fxUpdate(dt) { for (const f of FX.items) if (f.alive) { f.t += dt; CURS = f.S || null; if (f.vx) { f.x += f.vx * dt; f.y += f.vy * dt; }
+  if (f.kind === 'door' && !f.done && f.t >= 0.15) { f.done = true; for (const e of ENE.items) if (e.alive && dist2(e, f) < (f.R + e.r) ** 2) damage(e, f.dmg, null, 120, f.x, f.y); sfx('hit'); }
   if (f.kind === 'fire') for (const e of ENE.items) if (e.alive && dist2(e, f) < (f.R + e.r) ** 2) damage(e, f.dps * dt, null, 0);
   if (f.kind === 'puddle') for (const e of ENE.items) if (e.alive && dist2(e, f) < (16 + e.r) ** 2) damage(e, f.dps * dt, null, 0);
   if (f.kind === 'strike' && !f.done && f.t >= 0.35) { f.done = true; for (const e of ENE.items) if (e.alive && dist2(e, f) < (f.R + e.r) ** 2) damage(e, f.dmg, null, 60, f.x, f.y); if (f.tip) drop('tip', f.x, f.y, 1); sfx('hit'); }
@@ -460,7 +495,18 @@ function choose(i) { const c = G.choices && G.choices[i]; if (!c) return;
   applyChoice(c); G.choices = null; G.state = 'play'; if (G.xp >= G.xpNext) levelUp(); }
 function reroll() { if (G.rerolls > 0) { G.rerolls--; rollChoices(); sfx('tip'); } }
 function toggleBanish() { if (G.banishLeft > 0) G.banishMode = !G.banishMode; }
-function openChest() { const n = Math.random() < D.run.chest.tripleChance + (G.p.chestExtra || 0) ? 3 : 1, got = []; G.chestsOpened++;
+function fusionHas(f) { return G.fusions.some(x => x.id === f.id); }
+function fusionEligible() { const FR = D.fusionRules; if (G.fusions.length >= FR.maxPerRun) return [];
+  const rareUsed = G.fusions.filter(x => D.fusions.find(f => f.id === x.id).rare).length;
+  return D.fusions.filter(f => { if (fusionHas(f) || (f.rare && rareUsed >= FR.maxRarePerRun)) return false;
+    const ws = f.recipe.w.map(id => G.weapons.find(w => w.id === id)); if (ws.some(w => !w || !w.evo || w.lvl < FR.weaponLevel)) return false;
+    if (f.recipe.p) { const p = G.passives.find(p => p.id === f.recipe.p); if (!p || p.lvl < FR.passiveLevel) return false; } return true; }); }
+function doFusion(f) { for (const id of f.recipe.w) G.weapons = G.weapons.filter(w => w.id !== id); if (f.recipe.p) G.passives = G.passives.filter(p => p.id !== f.recipe.p);
+  G.fusions.push({ id: f.id, t: 0, st: { list: [] } }); recalcPassives(); let msg = '¡FUSIÓN: ' + f.name.toUpperCase() + '!';
+  if (!META.book.fused[f.id]) { META.book.fused[f.id] = Date.now(); META.keys += D.fusionRules.firstTimeKeys; msg += ' +' + D.fusionRules.firstTimeKeys + ' llaves'; saveMeta(); }
+  G.banner = { s: msg, t: 3.5 }; G.fusionFlash = 1.2; sfx('win'); G.fusionOpts = null; G.state = 'play'; }
+function openChest() { const el = fusionEligible(); if (el.length && G.state === 'play') { G.fusionOpts = el.slice(0, 3); G.state = 'fusion'; return; } openChestNormal(); }
+function openChestNormal() { const n = Math.random() < D.run.chest.tripleChance + (G.p.chestExtra || 0) ? 3 : 1, got = []; G.chestsOpened++;
   for (let i = 0; i < n; i++) { const pool = upgradePool(); if (!pool.length) { G.keys += 3; got.push('+3 llaves'); continue; } const owned = pool.filter(o => o.kind === 'w' && o.lvl > 1); const list = owned.length && Math.random() < 0.6 ? owned : pool; const c = list[Math.floor(Math.random() * list.length)];
     applyChoice(c); got.push(upLabel(c)[0]); }
   G.banner = { s: '🎁 Cofre' + (n === 3 ? ' x3' : '') + ': ' + got.join(', ').slice(0, 60), t: 3 }; sfx('win'); }
@@ -473,6 +519,7 @@ function achMet(c) { const runK = G.committed ? 0 : G.kills, runKar = G.committe
   if (c.wins) return META.wins >= c.wins;
   if (c.evolveCount) return G.evolved.length >= c.evolveCount; if (c.winMinHp) return !!G.win && G.minHpFrac >= c.winMinHp; if (c.winNoFood) return !!G.win && !Object.keys(G.ate).length;
   if (c.duenoUnder) return G.duenoKillTime != null && G.duenoKillTime < c.duenoUnder; if (c.winKills) return !!G.win && G.kills >= c.winKills;
+  if (c.fusionsTotal) return Object.keys(META.book.fused).length >= c.fusionsTotal; if (c.fusionsNormal) return D.fusions.filter(f => !f.rare && META.book.fused[f.id]).length >= c.fusionsNormal;
   if (c.allUnlocked) return D.characters.filter(ch => ch.unlock).every(ch => META.unlocked[ch.id]); return false; }
 function checkAch() { for (const a of D.achievements) if (!META.ach[a.id] && achMet(a.cond)) { const had = { ...META.unlocked }; grantAch(a.id); G.achNow.push(a.name);
   if (a.reward.unlock && !had[a.reward.unlock]) G.unlockedNow.push(D.characters.find(c => c.id === a.reward.unlock).name); } }
@@ -502,7 +549,7 @@ function update(dt) {
     if (bb.trail && P.moving) { G.trailT -= dt; if (G.trailT <= 0) { G.trailT = bb.trail.every; const f = FX.get(); if (f) Object.assign(f, { kind: 'fire', trail: true, x: P.x, y: P.y + 6, t: 0, dur: bb.trail.dur, dps: bb.trail.dps, R: bb.trail.r, vx: 0 }); } }
   }
   G.shake -= dt;
-  spawning(dt); weaponsUpdate(dt); projUpdate(dt); enemiesUpdate(dt); pickUpdate(dt); fxUpdate(dt);
+  spawning(dt); weaponsUpdate(dt); fusionsUpdate(dt); projUpdate(dt); enemiesUpdate(dt); pickUpdate(dt); fxUpdate(dt);
   if (G.banner) { G.banner.t -= dt; if (G.banner.t <= 0) G.banner = null; }
   if (G.state === 'play') checkAch();
 }
@@ -532,6 +579,7 @@ const ICON = { llave_inglesa: 'wrench', linterna: 'linterna', cuchillos: 'cuchil
 function weaponIcon(w) { const B = D.weapons[w.id]; return w.evo ? B.evo.spr : (ICON[w.id] || w.id); }
 function drawIcon(key, x, y, size) { const sh = SHEET[key]; const sw = sh ? sh.fw : (SPR[key] || SPR.tip).width, shh = sh ? sh.fs : (SPR[key] || SPR.tip).height; const s = size / Math.max(sw, shh);
   if (sh) ctx.drawImage(sh.img, 0, 0, sh.fw, sh.fs, x + (size - sw * s) / 2, y + (size - shh * s) / 2, sw * s, shh * s); else if (SPR[key]) ctx.drawImage(SPR[key], x + (size - sw * s) / 2, y + (size - shh * s) / 2, sw * s, shh * s); }
+function cosFilter(cos) { const c = cos && D.costumes[cos]; return c && c.filter && !SHEET['cos_' + cos] ? c.filter + (c.animated ? ' brightness(' + (1 + 0.15 * Math.sin(G_now() * 6)).toFixed(2) + ')' : '') : 'none'; }
 function playerKey(charId, cos) { return cos && SHEET['cos_' + cos] ? 'cos_' + cos : 'pl_' + charId; }
 function fmt(t) { t = Math.max(0, t); return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(Math.floor(t % 60)).padStart(2, '0'); }
 function footOf(e) { const b = e.d.behavior; return b === 'boss' || b === 'dueno' ? e.y + e.r * 0.8 : b === 'line' || b === 'ghost' ? e.y + e.r + 4 : e.y + e.r * 0.8; }
@@ -548,7 +596,7 @@ function renderWorld() {
   for (const f of FX.items) if (f.alive && f.kind === 'fire' && f.trail) { ctx.fillStyle = `rgba(255,215,64,${0.35 * (1 - f.t / f.dur)})`; ctx.fillRect(f.x - 4, f.y - 2, 8, 4); }
   for (const f of FX.items) if (f.alive && f.kind === 'fire' && !f.trail) { const sh = SHEET.llama_piso; if (sh) { ctx.globalAlpha = Math.min(1, (f.dur - f.t) * 2); const fk = f.big && SHEET.fx_barra_libre_fuego ? 'fx_barra_libre_fuego' : 'llama_piso'; for (let i = 0; i < 3; i++) drawAnim(fk, f.x + (i - 1) * f.R * 0.6, f.y + 6, Math.floor((f.t + i * 0.3) * 8), false); ctx.globalAlpha = 1; } else { ctx.fillStyle = 'rgba(255,120,0,.4)'; ctx.beginPath(); ctx.arc(f.x, f.y, f.R, 0, 7); ctx.fill(); } }
   for (const k of PICK.items) if (k.alive) { const blink = k.food && k.life < 4 && Math.floor(k.life * 6) % 2; if (blink) continue;
-    if (k.food) drawSpr(k.kind, k.x, k.y + Math.sin(G.t * 4 + k.x) * 1.5); else draw(SPR[k.kind], k.x, k.y + Math.sin(G.t * 5 + k.x) * 1.5); }
+    if (k.kind === 'chest' && G.fusions.length < 3 && fusionEligible().length) drawSpr('ui_cofre_violeta', k.x, k.y, 0, G.t * 0.4); else if (k.food) drawSpr(k.kind, k.x, k.y + Math.sin(G.t * 4 + k.x) * 1.5); else draw(SPR[k.kind], k.x, k.y + Math.sin(G.t * 5 + k.x) * 1.5); }
   for (const f of FX.items) if (f.alive && f.kind === 'ring') { const k = f.t / f.dur, R = f.r * (0.3 + 0.7 * k);
     if (f.spr && SHEET[f.spr]) { ctx.globalAlpha = 1 - k; drawSpr(f.spr, P.x, P.y, 0, k * 0.24, R / 16); ctx.globalAlpha = 1; }
     else { ctx.strokeStyle = f.evo ? `rgba(255,240,140,${1 - k})` : `rgba(242,194,48,${1 - k})`; ctx.lineWidth = f.evo ? 5 : 3; ctx.beginPath(); ctx.arc(P.x, P.y, R, 0, 7); ctx.stroke(); if (f.evo) { ctx.globalAlpha = 1 - k; drawSpr('evo_campana', P.x, P.y - 26, 0, 0); ctx.globalAlpha = 1; } } }
@@ -564,13 +612,26 @@ function renderWorld() {
     drawAnim(key, e.x, fy, fr, flip); ctx.globalAlpha = 1;
     if (e.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7; drawAnim(key, e.x, fy, fr, flip); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
     if (e.d.elite) { ctx.fillStyle = '#300'; ctx.fillRect(e.x - 14, fy - 34, 28, 3); ctx.fillStyle = '#ff3df5'; ctx.fillRect(e.x - 14, fy - 34, 28 * Math.max(0, e.hp / e.maxHp), 3); } }
-  for (const Q of G.players) { const blink = Q.inv > 0 && Math.floor(Q.inv * 20) % 2; if (!blink) drawAnim(playerKey(Q.charId, Q.costume), Q.x, Q.y + 8, animFrame(Q.moving, Q.anim), Q.fx < 0);
+  for (const Q of G.players) { const blink = Q.inv > 0 && Math.floor(Q.inv * 20) % 2; if (!blink) { ctx.filter = cosFilter(Q.costume); drawAnim(playerKey(Q.charId, Q.costume), Q.x, Q.y + 8, animFrame(Q.moving, Q.anim), Q.fx < 0); ctx.filter = 'none'; }
     ctx.fillStyle = '#300'; ctx.fillRect(Q.x - 12, Q.y + 12, 24, 3); ctx.fillStyle = '#3fdc5a'; ctx.fillRect(Q.x - 12, Q.y + 12, 24 * Q.hp / Q.maxHp, 3); }
   for (const w of G.weapons) { const S = WS(w); if (S.auraR) { const key = w.id === 'piedras' ? 'fx_sauna_vapor' : 'fx_charco_hielo';
       ctx.globalAlpha = 0.35; ctx.fillStyle = w.id === 'piedras' ? 'rgba(255,160,90,.25)' : 'rgba(120,200,255,.25)'; ctx.beginPath(); ctx.arc(P.x, P.y, S.auraR, 0, 7); ctx.fill();
       for (let i = 0; i < 6; i++) { const a = G.t * 0.6 + i * 1.05; drawSpr(w.id === 'piedras' ? 'fx_sauna_vapor' : 'proj_burbuja', P.x + Math.cos(a) * S.auraR * 0.6, P.y + Math.sin(a) * S.auraR * 0.6, 0, G.t); } ctx.globalAlpha = 1; }
     if (D.weapons[w.id].type === 'drone' && w.pos) for (const q of w.pos) drawSpr('proj_dron', q.x, q.y, 0, G.t); }
   for (const w of G.weapons) if (D.weapons[w.id].type === 'sarten' && w.pos) for (const q of w.pos) { if (w.evo) drawSpr('evo_olla', q.x, q.y, q.a * 2, 0, 0.75); else { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.a * 2); ctx.drawImage(SPR.sarten, -8, -8); ctx.restore(); } }
+  for (const F of G.fusions) { const f = D.fusions.find(x => x.id === F.id), Q = f.params, st = F.st;
+    if (F.id === 'recepcion24') for (const b of st.list) { drawAnim('fus_campana_fija', b.x, b.y + 10, b.ring > 0 ? 1 + Math.floor(G.t * 8) % 2 : 0, false); if (b.ring > 0) { ctx.strokeStyle = 'rgba(255,220,90,.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, Q.R * P.area * (1 - b.ring / 0.35), 0, 7); ctx.stroke(); } }
+    if (F.id === 'tren') st.list.forEach(q => drawAnim('fus_tren_vagon', q.x, q.y + 8, Math.floor(G.t * 8) % 2, false));
+    if (F.id === 'cinta') st.list.forEach(q => drawSpr('fus_cinta_segmento', q.x, q.y, q.a + Math.PI / 2, G.t));
+    if (F.id === 'cocina') { ctx.strokeStyle = 'rgba(255,110,30,.5)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(P.x, P.y, Q.R * P.area, 0, 7); ctx.stroke(); for (let i = 0; i < 10; i++) { const a = G.t + i * 0.63; drawAnim('llama_piso', P.x + Math.cos(a) * Q.R * P.area, P.y + Math.sin(a) * Q.R * P.area + 6, Math.floor(G.t * 8 + i), false); } }
+    if (F.id === 'cuarentena') { ctx.fillStyle = 'rgba(80,255,120,.12)'; ctx.beginPath(); ctx.arc(P.x, P.y, G.quarR, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(80,255,120,.5)'; ctx.stroke(); }
+    if (F.id === 'spa') { ctx.fillStyle = 'rgba(255,200,230,.12)'; ctx.beginPath(); ctx.arc(P.x, P.y, G.spaR, 0, 7); ctx.fill(); for (let i = 0; i < 5; i++) { const a = G.t * 0.5 + i * 1.26; drawSpr('fx_sauna_vapor', P.x + Math.cos(a) * G.spaR * 0.6, P.y + Math.sin(a) * G.spaR * 0.6, 0, G.t); } }
+    if (F.id === 'glaciar') { ctx.globalAlpha = 0.45; drawSpr('fx_glaciar_piso', P.x, P.y, 0, G.t, Q.R * P.area / 32); ctx.globalAlpha = 1; }
+    if (F.id === 'torre') st.list.forEach(q => drawSpr('proj_dron', q.x, q.y, 0, G.t));
+    if (F.id === 'banquete') drawSpr('fus_mesa_bodas', P.x, P.y - 20, 0, G.t * 0.5, 0.6);
+    if (F.id === 'inventario' && st.boom > 0) { ctx.strokeStyle = 'rgba(255,60,60,.8)'; for (const e of st.marked) if (e.alive) { ctx.strokeRect(e.x - 8, e.y - 8, 16, 16); } }
+    if (F.id === 'tsunami' && st.on) { for (let y = P.y - H / 2; y < P.y + H / 2; y += 32) drawSpr('fx_tsunami_ola', st.wx, y + 16, 0, G.t); } }
+  for (const f of FX.items) if (f.alive && f.kind === 'door' && f.t >= 0) drawAnim('fus_puerta', f.x, f.y + 10, f.done ? 1 : 0, false);
   for (const p of PROJ.items) if (p.alive) { const ar = p.lob ? Math.sin(Math.PI * p.t / 0.6) * 30 : 0; drawSpr(p.spr, p.x, p.y - ar, p.ang || 0, p.t); }
   for (const f of FX.items) if (f.alive) { const k = f.t / f.dur;
     if (f.kind === 'poof') { ctx.fillStyle = `rgba(255,255,255,${1 - k})`; for (let i = 0; i < 6; i++) { const a = i * 1.05; ctx.fillRect(f.x + Math.cos(a) * 12 * k - 1, f.y + Math.sin(a) * 12 * k - 1, 3, 3); } }
@@ -586,6 +647,8 @@ function renderWorld() {
     else if (f.kind === 'arc') { if (SHEET.arco_baston) { ctx.globalAlpha = 1 - k * 0.5; drawSpr('arco_baston', f.x + Math.cos(f.ang) * f.r * 0.5, f.y + Math.sin(f.ang) * f.r * 0.5, f.ang, k * 0.24, f.r / 24); ctx.globalAlpha = 1; } }
     if (f.kind === 'num') { ctx.globalAlpha = 1 - k; txt(String(f.v), f.x, f.y - k * 10, 7, f.col || '#fff', 'center'); ctx.globalAlpha = 1; } }
   ctx.restore();
+  if (G.dark > 0) { const ap = G.fusions.find(x => x.id === 'apagon'); const Rr = ap ? D.fusions.find(f => f.id === 'apagon').params.R * G.p.area : 90; ctx.save(); ctx.fillStyle = 'rgba(0,0,10,.85)'; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(W / 2, H / 2, Rr, 0, Math.PI * 2, true); ctx.fill('evenodd'); ctx.restore(); }
+  if (G.fusionFlash > 0) { G.fusionFlash -= 1 / 60; ctx.fillStyle = `rgba(190,90,255,${G.fusionFlash * 0.4})`; ctx.fillRect(0, 0, W, H); }
   if (JOY.active) { ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(JOY.sx, JOY.sy, 30, 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,.35)'; const dx = JOY.x - JOY.sx, dy = JOY.y - JOY.sy, d = Math.min(30, Math.hypot(dx, dy)), a = Math.atan2(dy, dx); ctx.beginPath(); ctx.arc(JOY.sx + Math.cos(a) * d, JOY.sy + Math.sin(a) * d, 12, 0, 7); ctx.fill(); }
 }
 function renderHUD() {
@@ -601,6 +664,7 @@ function renderHUD() {
       if (row === 0) { drawIcon(weaponIcon(it), x, y, bs); if (it.lvl >= 8) { if (SHEET.ui_maestria) drawIcon('ui_maestria', x + bs - 8, y - 2, 8); ctx.strokeStyle = '#ffd23f'; ctx.strokeRect(x + .5, y + .5, bs - 1, bs - 1); } }
       else drawIcon(D.passives[it.id].icon || ('ic_' + it.id), x, y, bs);
       txt(String(it.lvl), x + bs - 3, y + bs - 1, 5, '#ffd23f'); } }
+  G.fusions.forEach((F, i) => { const f = D.fusions.find(x => x.id === F.id); drawIcon(f.icon, 4 + D.run.slotsMax * 18 + 6 + i * 20, H - 40, 18); });
   const bb = (G.boss && G.boss.alive) ? G.boss : (G.mini && G.mini.alive ? G.mini : null);
   if (bb) { const bw = Math.min(260, W - 40); ctx.fillStyle = '#300'; ctx.fillRect(W / 2 - bw / 2, 34, bw, 6); ctx.fillStyle = bb === G.boss ? '#d4af37' : '#ff2a2a'; ctx.fillRect(W / 2 - bw / 2, 34, bw * bb.hp / bb.maxHp, 6);
     txt(bb.d.name.toUpperCase() + (bb === G.boss ? ' · FASE ' + (bb.phase || 1) : ''), W / 2, 50, 7, '#ffb080', 'center'); }
@@ -626,6 +690,26 @@ function renderLevelUp() { overlay(); txt(G.banishMode ? 'ELEGÍ UNA OPCIÓN PAR
   btn(W / 2 - 110, by, 104, 18, 'Reroll (' + G.rerolls + ') [R]', reroll, { disabled: G.rerolls <= 0 }); if (SHEET.ui_btn_reroll) drawIcon('ui_btn_reroll', W / 2 - 128, by, 18);
   btn(W / 2 + 6, by, 104, 18, 'Descartar (' + G.banishLeft + ') [X]', toggleBanish, { disabled: G.banishLeft <= 0, hl: G.banishMode }); if (SHEET.ui_btn_descarte) drawIcon('ui_btn_descarte', W / 2 + 112, by, 18);
   txt('Slots: ' + G.weapons.length + '/' + slotsOpen() + ' armas · ' + G.passives.length + '/' + slotsOpen() + ' pasivos', W / 2, by + 32, 6, '#aaa', 'center'); }
+function renderFusion() { overlay(0.8); txt('COFRE VIOLETA: ¿FUSIONAR?', W / 2, 40, 13, '#c58cff', 'center');
+  const n = G.fusionOpts.length, cw = Math.min(170, (W - 30) / n - 8), y = 60;
+  G.fusionOpts.forEach((f, i) => { const x = W / 2 + (i - (n - 1) / 2) * (cw + 8) - cw / 2; ctx.fillStyle = '#2a1740'; ctx.fillRect(x, y, cw, 120); ctx.strokeStyle = f.rare ? '#ffd23f' : '#c58cff'; ctx.strokeRect(x + .5, y + .5, cw - 1, 119);
+    drawIcon(f.icon, x + cw / 2 - 16, y + 6, 32); txt(f.name, x + cw / 2, y + 50, 7, '#fff', 'center'); const rec = f.recipe.w.map(id => D.weapons[id].evo.name).concat(f.recipe.p ? [D.passives[f.recipe.p].name] : []).join(' + ');
+    txt(rec.slice(0, 34), x + cw / 2, y + 62, 5, '#c58cff', 'center'); txt(f.desc.slice(0, 34), x + cw / 2, y + 74, 5, '#ccc', 'center'); txt(f.desc.slice(34, 68), x + cw / 2, y + 82, 5, '#ccc', 'center');
+    btn(x + 8, y + 94, cw - 16, 18, 'FUSIONAR [' + (i + 1) + ']', () => doFusion(f), { hl: true, size: 7 }); });
+  txt('El arma y el pasivo desaparecen y se libera su slot. Fusiones: ' + G.fusions.length + '/' + D.fusionRules.maxPerRun, W / 2, y + 136, 6, '#aaa', 'center');
+  btn(W / 2 - 70, y + 146, 140, 20, 'NO, abrir cofre normal [N]', () => { G.fusionOpts = null; G.state = 'play'; openChestNormal(); }, { size: 6 }); }
+function bookState(f) { const B = META.book, wHalf = f.recipe.w.every(id => B.revealed[id + ':w']), pHalf = f.recipe.p ? !!B.revealed[f.recipe.p + ':p'] : wHalf; return { fused: !!B.fused[f.id], wHalf, pHalf, any: f.recipe.w.some(id => B.revealed[id + ':w']) || (f.recipe.p && B.revealed[f.recipe.p + ':p']) }; }
+function renderBook() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt('LIBRO DE RECETAS ' + Object.keys(META.book.fused).length + '/' + D.fusions.length, W / 2, 18, 12, '#c58cff', 'center');
+  const per = 10, cw = 40, chh = 56, sx = W / 2 - per * (cw + 4) / 2;
+  D.fusions.forEach((f, i) => { const col = i % per, row = Math.floor(i / per), x = sx + col * (cw + 4), y = 28 + row * (chh + 52), s = bookState(f);
+    const card = s.fused ? (f.card || 'ui_receta_revelada') : (s.wHalf && s.pHalf ? (f.card || 'ui_receta_revelada') : 'ui_receta_silueta');
+    if (SHEET[card]) drawIcon(card, x + 4, y, 48); if ((s.fused || (s.wHalf && s.pHalf)) && !f.card) drawIcon(f.icon, x + 12, y + 2, 32);
+    if (s.fused && SHEET.ui_receta_brillo) { ctx.globalAlpha = 0.5; const sh = SHEET.ui_receta_brillo; ctx.drawImage(sh.img, (Math.floor(G_now() * 3) % sh.n) * sh.fw, 0, sh.fw, sh.fs, x + 12, y, 32, 48); ctx.globalAlpha = 1; }
+    const nm = s.fused || (s.wHalf && s.pHalf) ? f.name : '???'; txt(nm.slice(0, 11), x + cw / 2 + 4, y + 56, 4, s.fused ? '#ffd23f' : '#ccc', 'center');
+    let r1 = f.rare ? (s.wHalf ? f.recipe.w.map(id => D.weapons[id].evo.name.split(' ')[0]).join('+') : 'Requiere dos') : (s.wHalf ? D.weapons[f.recipe.w[0]].evo.name.split(' ')[0] : '???'), r2 = f.rare ? (s.wHalf ? '' : 'armas maestras') : (s.pHalf ? '+' + D.passives[f.recipe.p].name.split(' ')[0] : '+ ???');
+    txt(r1.slice(0, 12), x + cw / 2 + 4, y + 63, 4, f.rare ? '#ffd23f' : '#c58cff', 'center'); txt(r2.slice(0, 12), x + cw / 2 + 4, y + 69, 4, '#c58cff', 'center'); });
+  btn(W / 2 - 50, H - 24, 100, 18, 'Volver [Esc]', () => { screen = 'menu'; }); }
+const G_now = () => performance.now() / 1000;
 function renderPause() { overlay(); txt('PAUSA', W / 2, H / 2 - 30, 16, '#fff', 'center'); btn(W / 2 - 50, H / 2 - 10, 100, 20, 'Seguir [Esc]', togglePause);
   btn(W / 2 - 50, H / 2 + 16, 100, 20, 'Abandonar', () => { G.state = 'play'; endRun(false); }); btn(W / 2 - 50, H / 2 + 42, 100, 20, 'Sonido: ' + (AU.on ? 'ON' : 'OFF'), () => { AU.on = !AU.on; if (AU.mus) AU.mus.gain.value = AU.on ? 0.18 : 0; }); }
 function renderSummary() { overlay(0.8); txt(G.win ? '¡EL HOTEL ES TUYO!' : 'TE DIERON DE BAJA', W / 2, 46, 16, G.win ? '#3fdc5a' : '#ff6060', 'center');
@@ -658,7 +742,8 @@ function renderMenu() {
   y += 20; const own = costumesOf(META.sel), cur = META.costumeSel[META.sel];
   btn(W / 2 - 128, y, 124, 16, 'Traje: ' + (cur ? D.costumes[cur].name : 'Clásico') + (own.length ? ' [T]' : ' (sin trajes)'), cycleCostume, { size: 5, disabled: !own.length });
   btn(W / 2 + 4, y, 124, 16, 'Logros ' + Object.keys(META.ach).length + '/' + D.achievements.length + ' [L]', () => { screen = 'ach'; }, { size: 6 });
-  btn(W / 2 - 60, y + 22, 120, 22, 'JUGAR [Enter]', startSelected, { hl: true, size: 10 });
+  btn(W / 2 - 60, y + 22, 120, 22, 'JUGAR [Enter]', startSelected, { hl: true, size: 10 }); btn(W / 2 + 66, y + 22, 62, 22, 'Recetas [B]', () => { screen = 'book'; }, { size: 6 });
+  const tips = D.loadingTips; txt('Tip: ' + tips[Math.floor(G_now() / 6) % tips.length], W / 2, Math.min(H - 12, y + 50), 5, '#c58cff', 'center');
   txt('WASD/Flechas o arrastrá · Esc/P pausa · 1-9 elegir', W / 2, Math.min(H - 4, y + 56), 5, '#999', 'center');
 }
 function renderAch() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt('LOGROS', W / 2, 22, 14, '#f2c230', 'center');
@@ -668,11 +753,13 @@ function renderAch() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt(
 function startSelected() { if (!META.unlocked[META.sel]) META.sel = 'recep'; newRun(META.sel); }
 function togglePause() { if (!G) return; if (G.state === 'play') G.state = 'pause'; else if (G.state === 'pause') G.state = 'play'; }
 function onKey(c) {
+  if (screen === 'book') { if (c === 'Escape' || c === 'KeyB' || c === 'Enter') screen = 'menu'; return; }
   if (screen === 'ach') { if (c === 'Escape' || c === 'KeyL' || c === 'Enter') screen = 'menu'; return; }
-  if (screen === 'menu') { if (c === 'Enter' || c === 'Space') startSelected(); if (c === 'KeyL') screen = 'ach'; if (c === 'KeyT') cycleCostume();
+  if (screen === 'menu') { if (c === 'Enter' || c === 'Space') startSelected(); if (c === 'KeyL') screen = 'ach'; if (c === 'KeyB') screen = 'book'; if (c === 'KeyT') cycleCostume();
     const i = +c.replace('Digit', '') - 1; const ch = D && D.characters[i]; if (ch && META.unlocked[ch.id]) { META.sel = ch.id; saveMeta(); } return; }
   if (!G) return;
   if (c === 'Escape' || c === 'KeyP') togglePause();
+  if (G.state === 'fusion') { const i = +c.replace('Digit', '') - 1; if (G.fusionOpts[i]) doFusion(G.fusionOpts[i]); if (c === 'KeyN') { G.fusionOpts = null; G.state = 'play'; openChestNormal(); } }
   if (G.state === 'levelup') { const i = +c.replace('Digit', '') - 1; if (i >= 0 && i < 5) choose(i); if (c === 'KeyR') reroll(); if (c === 'KeyX') toggleBanish(); }
   if (G.state === 'over') { if (c === 'Enter' || c === 'Space') newRun(G.char.id); if (c === 'KeyM') { screen = 'menu'; G = null; } }
 }
@@ -683,8 +770,8 @@ function frame(ts) {
   const steps = Math.max(1, Math.round(DBG.speed)); for (let i = 0; i < steps; i++) update(raw * DBG.speed / steps);
   processClicks(); buttons = [];
   ctx.setTransform(SC, 0, 0, SC, 0, 0); ctx.imageSmoothingEnabled = false;
-  if (screen === 'menu') renderMenu(); else if (screen === 'ach') renderAch();
-  else { renderWorld(); renderHUD(); if (G.state === 'levelup') renderLevelUp(); else if (G.state === 'pause') renderPause(); else if (G.state === 'over') renderSummary(); }
+  if (screen === 'menu') renderMenu(); else if (screen === 'ach') renderAch(); else if (screen === 'book') renderBook();
+  else { renderWorld(); renderHUD(); if (G.state === 'levelup') renderLevelUp(); else if (G.state === 'pause') renderPause(); else if (G.state === 'fusion') renderFusion(); else if (G.state === 'over') renderSummary(); }
   renderToasts(raw);
   if (DBG.speed !== 1 || DBG.t || DBG.god || DBG.dmg !== 1) txt('DEBUG x' + DBG.speed + (DBG.god ? ' god' : '') + (DBG.dmg !== 1 ? ' dmg' + DBG.dmg : ''), W - 4, H - 4, 6, '#f55', 'right');
   requestAnimationFrame(frame);
@@ -693,7 +780,7 @@ function frame(ts) {
 (async function boot() {
   resize(); D = await loadData(); buildSprites(); buildExtraSprites(); loadMeta(); await loadSheets();
   ENE = new Pool(D.timeline.maxEnemies + 60, () => ({})); PROJ = new Pool(500, () => ({})); PICK = new Pool(700, () => ({})); FX = new Pool(500, () => ({}));
-  window.CC = { get G() { return G; }, get screen() { return screen; }, get META() { return META; }, enemies: () => ENE.count(), openChest: () => openChest(), slotsOpen: () => slotsOpen(), WS: id => WS(G.weapons.find(w => w.id === id)), sheets: () => Object.keys(SHEET), foodCount, choose, newRun, addWeapon: id => addWeapon(id), addPassive: id => addPassive(id), recalc: () => recalcPassives(), DBG };
+  window.CC = { get G() { return G; }, get screen() { return screen; }, get META() { return META; }, enemies: () => ENE.count(), fusionEligible: () => fusionEligible(), doFusion: id => doFusion(D.fusions.find(f => f.id === id)), openChest: () => openChest(), slotsOpen: () => slotsOpen(), WS: id => WS(G.weapons.find(w => w.id === id)), sheets: () => Object.keys(SHEET), foodCount, choose, newRun, addWeapon: id => addWeapon(id), addPassive: id => addPassive(id), recalc: () => recalcPassives(), DBG };
   requestAnimationFrame(frame);
 })();
 })();

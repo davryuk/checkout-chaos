@@ -199,7 +199,9 @@
     "text": "3 evoluciones en una run"
    },
    "price": 180,
-   "costumes": []
+   "costumes": [
+    "bartender_traje"
+   ]
   },
   {
    "id": "salvavidas",
@@ -1866,6 +1868,17 @@
   "conserje_sobretodo": {
    "char": "conserje",
    "name": "Sobretodo Largo"
+  },
+  "bartender_traje": {
+   "char": "bartender",
+   "name": "Traje Bartender",
+   "filter": "hue-rotate(160deg) saturate(1.3)"
+  },
+  "recep_dorado": {
+   "char": "recep",
+   "name": "Traje Dorado",
+   "filter": "sepia(1) saturate(4) hue-rotate(5deg) brightness(1.15)",
+   "animated": true
   }
  },
  "achievements": [
@@ -2094,6 +2107,50 @@
    "reward": {
     "keys": 500
    }
+  },
+  {
+   "id": "aprendiz",
+   "name": "Aprendiz",
+   "desc": "Hacé 1 fusión",
+   "cond": {
+    "fusionsTotal": 1
+   },
+   "reward": {
+    "keys": 200
+   }
+  },
+  {
+   "id": "sommelier",
+   "name": "Sommelier",
+   "desc": "Descubrí 6 fusiones",
+   "cond": {
+    "fusionsTotal": 6
+   },
+   "reward": {
+    "costume": "bartender_traje"
+   }
+  },
+  {
+   "id": "chef_cocina",
+   "name": "Chef de Cocina",
+   "desc": "Descubrí las 15 fusiones normales",
+   "cond": {
+    "fusionsNormal": 15
+   },
+   "reward": {
+    "keys": 1000
+   }
+  },
+  {
+   "id": "leyenda",
+   "name": "Leyenda del Hotel",
+   "desc": "Descubrí las 19 fusiones",
+   "cond": {
+    "fusionsTotal": 19
+   },
+   "reward": {
+    "costume": "recep_dorado"
+   }
   }
  ],
  "levelRules": {
@@ -2135,5 +2192,388 @@
   },
   "critMul": 2.0,
   "baseCrit": 0.0
- }
+ },
+ "fusions": [
+  {
+   "id": "recepcion24",
+   "name": "Recepción 24 hs",
+   "icon": "fus_recepcion_24hs",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "timbre"
+    ],
+    "p": "reloj"
+   },
+   "desc": "Campanas fijas que siguen sonando donde estabas (máx 3)",
+   "params": {
+    "every": 4,
+    "max": 3,
+    "pulse": 1.2,
+    "R": 90,
+    "dmg": 40
+   }
+  },
+  {
+   "id": "tren",
+   "name": "Tren de Lavandería",
+   "icon": "fus_tren_lavanderia",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "carrito"
+    ],
+    "p": "plano"
+   },
+   "desc": "Fila de 6 carritos que te sigue como serpiente",
+   "params": {
+    "n": 6,
+    "gap": 14,
+    "dmg": 35,
+    "hitCd": 0.4
+   }
+  },
+  {
+   "id": "cinta",
+   "name": "Cinta del Aeropuerto",
+   "icon": "fus_cinta_aeropuerto",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "valija"
+    ],
+    "p": "llavero"
+   },
+   "desc": "Cinta circular de valijas que gira a tu alrededor",
+   "params": {
+    "n": 10,
+    "R": 70,
+    "spin": 1.8,
+    "dmg": 30,
+    "hitCd": 0.4
+   }
+  },
+  {
+   "id": "cocina",
+   "name": "Cocina Infernal",
+   "icon": "fus_cocina_infernal",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "sarten"
+    ],
+    "p": "cama"
+   },
+   "desc": "Anillo de fuego; cada kill adentro te cura",
+   "params": {
+    "R": 80,
+    "dps": 60,
+    "healOnKill": 1
+   }
+  },
+  {
+   "id": "cuarentena",
+   "name": "Cuarentena",
+   "icon": "fus_cuarentena",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "spray"
+    ],
+    "p": "seguro"
+   },
+   "desc": "Zona verde: los enemigos pierden 2%/s y no atacan",
+   "params": {
+    "R": 120,
+    "pctPerSec": 0.02
+   }
+  },
+  {
+   "id": "seguridad",
+   "name": "Sistema de Seguridad",
+   "icon": "fus_sistema_seguridad",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "tarjeta"
+    ],
+    "p": "amuleto"
+   },
+   "desc": "Puertas que se cierran en línea, crítico asegurado",
+   "params": {
+    "every": 2.5,
+    "n": 6,
+    "gap": 26,
+    "dmg": 90,
+    "R": 16
+   }
+  },
+  {
+   "id": "terraza",
+   "name": "Fiesta en la Terraza",
+   "icon": "fus_fiesta_terraza",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "botella"
+    ],
+    "p": "zapatos"
+   },
+   "desc": "Dejás fuego al correr; más rápido, más fuego",
+   "params": {
+    "every": 0.08,
+    "dur": 2.0,
+    "dpsPerSpeed": 0.35,
+    "R": 14
+   }
+  },
+  {
+   "id": "evacuacion",
+   "name": "Evacuación",
+   "icon": "fus_evacuacion",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "silbato"
+    ],
+    "p": "uniforme"
+   },
+   "desc": "Cada 8 s empuja a todos los enemigos al borde",
+   "params": {
+    "every": 8,
+    "dmg": 40
+   }
+  },
+  {
+   "id": "spa",
+   "name": "Spa de Lujo",
+   "icon": "fus_spa_lujo",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "piedras"
+    ],
+    "p": "propina"
+   },
+   "desc": "Enemigos dentro del aura dan XP doble",
+   "params": {
+    "R": 110,
+    "dps": 30,
+    "xpMul": 2
+   }
+  },
+  {
+   "id": "valetvip",
+   "name": "Valet Parking VIP",
+   "icon": "fus_valet_vip",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "auto"
+    ],
+    "p": "cafe"
+   },
+   "desc": "3 limusinas cada 3 s en direcciones distintas",
+   "params": {
+    "every": 3,
+    "n": 3,
+    "dmg": 90,
+    "speed": 330
+   }
+  },
+  {
+   "id": "inventario",
+   "name": "Inventario Anual",
+   "icon": "fus_inventario_anual",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "memo"
+    ],
+    "p": "plano"
+   },
+   "desc": "Cada 10 s marca toda la pantalla y la hace explotar",
+   "params": {
+    "every": 10,
+    "delay": 1.0,
+    "dmg": 150
+   }
+  },
+  {
+   "id": "blackfriday",
+   "name": "Black Friday",
+   "icon": "fus_black_friday",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "billetes"
+    ],
+    "p": "amuleto"
+   },
+   "desc": "Billetes por toda la pantalla, 10% chance de cofre",
+   "params": {
+    "every": 0.25,
+    "R": 34,
+    "dmg": 60,
+    "chestOnKill": 0.1
+   }
+  },
+  {
+   "id": "glaciar",
+   "name": "Glaciar del Lobby",
+   "icon": "fus_glaciar_lobby",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "cubitos"
+    ],
+    "p": "reloj"
+   },
+   "desc": "Piso congelado alrededor; congelados reciben daño x2",
+   "params": {
+    "R": 100,
+    "freezeEvery": 2.5,
+    "freeze": 1.0,
+    "frozenDmgMul": 2
+   },
+   "card": "ui_receta_glaciar_lobby"
+  },
+  {
+   "id": "torre",
+   "name": "Torre de Control",
+   "icon": "fus_torre_control",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "drone"
+    ],
+    "p": "walkie"
+   },
+   "desc": "6 drones que también juntan propinas y XP de toda la pantalla",
+   "params": {
+    "n": 6,
+    "R": 80,
+    "cd": 0.6,
+    "dmg": 30
+   },
+   "card": "ui_receta_torre_control"
+  },
+  {
+   "id": "desayuno",
+   "name": "Desayuno Continental",
+   "icon": "fus_desayuno_continental",
+   "rare": false,
+   "recipe": {
+    "w": [
+     "bandeja"
+    ],
+    "p": "minibar"
+   },
+   "desc": "Cada bandeja que golpea cura 1 y deja comida al 3%",
+   "params": {
+    "n": 4,
+    "cd": 2.0,
+    "dmg": 40,
+    "speed": 230,
+    "food": 0.03,
+    "heal": 1
+   },
+   "card": "ui_receta_desayuno_continental"
+  },
+  {
+   "id": "banquete",
+   "name": "Banquete de Bodas",
+   "icon": "fus_banquete_bodas",
+   "rare": true,
+   "recipe": {
+    "w": [
+     "sarten",
+     "cuchillos"
+    ],
+    "p": null
+   },
+   "desc": "Mesa giratoria que dispara cubiertos en espiral y cura 1 por kill",
+   "params": {
+    "every": 0.07,
+    "dmg": 28,
+    "speed": 260,
+    "healOnKill": 1
+   }
+  },
+  {
+   "id": "apagon",
+   "name": "Apagón",
+   "icon": "fus_apagon",
+   "rare": true,
+   "recipe": {
+    "w": [
+     "linterna",
+     "baston"
+    ],
+    "p": null
+   },
+   "desc": "Cada 15 s se apaga todo 4 s: lo que queda fuera de tu luz recibe daño enorme",
+   "params": {
+    "every": 15,
+    "dur": 4,
+    "R": 95,
+    "dps": 400,
+    "bossDps": 40
+   }
+  },
+  {
+   "id": "checkout",
+   "name": "Check-Out Forzado",
+   "icon": "fus_checkout_forzado",
+   "rare": true,
+   "recipe": {
+    "w": [
+     "tarjeta",
+     "auto"
+    ],
+    "p": null
+   },
+   "desc": "Cada 12 s elimina al 20% de los enemigos normales en pantalla",
+   "params": {
+    "every": 12,
+    "pct": 0.2
+   }
+  },
+  {
+   "id": "tsunami",
+   "name": "Tsunami de Spa",
+   "icon": "fus_tsunami_spa",
+   "rare": true,
+   "recipe": {
+    "w": [
+     "burbujas",
+     "toalla"
+    ],
+    "p": null
+   },
+   "desc": "Ola que barre la pantalla de lado a lado cada 10 s",
+   "params": {
+    "every": 10,
+    "speed": 420,
+    "dmg": 200,
+    "kb": 300
+   },
+   "card": "ui_receta_tsunami_spa"
+  }
+ ],
+ "fusionRules": {
+  "maxPerRun": 3,
+  "maxRarePerRun": 1,
+  "weaponLevel": 8,
+  "passiveLevel": 5,
+  "firstTimeKeys": 100
+ },
+ "loadingTips": [
+  "Dicen que el chef y el cuchillero comparten mesa...",
+  "Cuando se corta la luz, quedate cerca de la linterna.",
+  "Las llaves maestras y las limusinas conocen la salida.",
+  "Las burbujas y las toallas sueñan con el mar.",
+  "Un cofre violeta guarda algo más que una mejora.",
+  "Dos armas maestras pueden fundirse en una leyenda."
+ ]
 }
