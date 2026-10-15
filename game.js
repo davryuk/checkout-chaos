@@ -138,7 +138,7 @@ function note(f, t, d, type, v) { const o = AU.ctx.createOscillator(), g = AU.ct
 // ---------------- meta (localStorage, v2 with v1 migration; v1 key is never deleted) -------------
 const META_KEY_V1 = 'checkoutChaos.meta.v1', META_KEY = 'checkoutChaos.meta.v2';
 let META;
-function metaDefaults() { return { v: 2, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true }, shop: { hp: 0, dmg: 0, reroll: 0 }, sel: 'recep',
+function metaDefaults() { return { v: 2, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true, botones: true, cocinero: true }, shop: { hp: 0, dmg: 0, reroll: 0 }, sel: 'recep',
   ach: {}, costumes: {}, costumeSel: {}, stats: { karens: 0, winsAs: {}, lifetimeKeys: 0 }, migratedFromV1: false }; }
 function loadMeta() {
   let m = null; try { m = JSON.parse(localStorage.getItem(META_KEY)); } catch (e) { }
@@ -151,6 +151,7 @@ function loadMeta() {
   if (META.pendingRetro) { const r = META.pendingRetro; delete META.pendingRetro;   // v1 win = beat La Inspección (old final boss)
     if (r.bestTime >= 60) grantAch('primer_turno', true); if (r.bestTime >= 300 || r.botones) grantAch('media_jornada', true);
     if (r.v1wins > 0) grantAch('inspeccion', true); if (META.totalKills >= 500) grantAch('matanza', true); }
+  for (const c of D.characters) if (!c.unlock) META.unlocked[c.id] = true;
   saveMeta(); }
 function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(META)); } catch (e) { } }
 let achToast = [];
@@ -199,7 +200,7 @@ function newRun(charId) {
   const ch = D.characters.find(c => c.id === charId); const b = ch.bonus || {};
   G = { state: 'play', t: DBG.t, kills: 0, karens: 0, keys: 0, lvl: 1, xp: 0, xpNext: 5, char: ch, weapons: [], passives: [], boss: null, mini: null, inspSpawned: false, duenoSpawned: false,
     nextElite: TLd().firstElite, nextConga: TLd().congaFrom, spawnAcc: 0, rerolls: META.shop.reroll, choices: null, pulse: 0, unlockedNow: [], achNow: [], shake: 0,
-    evolved: [], ate: {}, killed: {}, magnetT: 0, committed: false,
+    evolved: [], ate: {}, minHpFrac: 1, revived: false, trailT: 0, duenoT: null, killed: {}, magnetT: 0, committed: false,
     players: [{ id: 0, inputSlot: 0, charId: ch.id, costume: META.costumeSel[ch.id] || null, anim: 0, input: { mx: 0, my: 0 }, x: 0, y: 0, hp: 0,
       maxHp: 120 + 10 * META.shop.hp + (b.hp || 0), speed: 95, regen: b.regen || 0, armor: 0, pickup: 40 * (b.pickup || 1), heal: b.heal || 1, keyMul: b.keys || 1,
       dmg: (b.dmg || 1) * (1 + 0.05 * META.shop.dmg) * DBG.dmg, cd: 1, xpMul: 1, fx: 1, fy: 0, inv: 0, kbx: 0, kby: 0 }] };
@@ -211,10 +212,11 @@ function newRun(charId) {
     if (DBG.t > T.inspAt + 1) G.inspSpawned = true; }
 }
 function addWeapon(id) { let w = G.weapons.find(w => w.id === id); if (w) w.lvl = Math.min(5, w.lvl + 1); else G.weapons.push(w = { id, lvl: 1, a: 0, cd: 0 });
-  const S = D.weapons[id]; if (w.lvl === 5 && S.evo && !w.evo) { w.evo = true; G.evolved.push(id); G.banner = { s: '¡EVOLUCIÓN: ' + S.evo.name.toUpperCase() + '!', t: 3 }; sfx('win'); } }
+  const S = D.weapons[id]; if (w.lvl === 5 && G.players) recalcPassives();
+  if (w.lvl === 5 && S.evo && !w.evo) { w.evo = true; G.evolved.push(id); G.banner = { s: '¡EVOLUCIÓN: ' + S.evo.name.toUpperCase() + '!', t: 3 }; sfx('win'); } }
 function addPassive(id) { let p = G.passives.find(p => p.id === id); if (p) p.lvl = Math.min(5, p.lvl + 1); else G.passives.push(p = { id, lvl: 1 }); recalcPassives(); }
 function recalcPassives() { const ch = G.char.bonus || {}; const lv = id => (G.passives.find(p => p.id === id) || { lvl: 0 }).lvl;
-  for (const P of G.players) { P.cd = (ch.cd || 1) * Math.pow(0.92, lv('cafe')); P.armor = (ch.armor || 0) + lv('uniforme'); P.xpMul = (ch.xp || 1) * (1 + 0.12 * lv('propina')); P.speed = 95 * (ch.speed || 1) * (1 + 0.08 * lv('zapatos')); } }
+  for (const P of G.players) { const maxed = G.weapons.filter(w => w.lvl >= 5).length; P.cd = (ch.cd || 1) * Math.pow(0.92, lv('cafe')) / (1 + (ch.cdPerMaxed || 0) * maxed); P.armor = (ch.armor || 0) + lv('uniforme'); P.xpMul = (ch.xp || 1) * (1 + 0.12 * lv('propina')); P.speed = 95 * (ch.speed || 1) * (1 + 0.08 * lv('zapatos')); } }
 function WS(w) { const B = D.weapons[w.id], L = w.lvl - 1, o = {}; for (const k in B) if (Array.isArray(B[k])) o[k] = B[k][L];
   if (w.evo) { const m = B.evo.mods; for (const k in m) { if (k.endsWith('+')) o[k.slice(0, -1)] = (o[k.slice(0, -1)] || 0) + m[k]; else if (typeof o[k] === 'number') o[k] *= m[k]; else o[k] = m[k]; } }
   return o; }
@@ -232,7 +234,7 @@ function phaseName() { const T = TLd(), t = G.t; if (G.boss && G.boss.alive) ret
 function spawning(dt) {
   const t = G.t, T = TLd(); if (G.victory) return;
   if (!G.inspSpawned && t >= T.inspAt) { G.inspSpawned = true; const p = edgePos(10); G.mini = spawnEnemy('inspeccion', p.x, p.y); sfx('boss'); G.banner = { s: '¡LLEGÓ LA INSPECCIÓN! · TEMPORADA ALTA', t: 3 }; }
-  if (!G.duenoSpawned && t >= T.dueAt) { G.duenoSpawned = true; const p = edgePos(10); G.boss = spawnEnemy('dueno', p.x, p.y); sfx('boss'); G.banner = { s: '¡EL DUEÑO DEL HOTEL!', t: 3 }; }
+  if (!G.duenoSpawned && t >= T.dueAt) { G.duenoSpawned = true; const p = edgePos(10); G.boss = spawnEnemy('dueno', p.x, p.y); G.duenoT = t; sfx('boss'); G.banner = { s: '¡EL DUEÑO DEL HOTEL!', t: 3 }; }
   if (t >= T.breathFrom && t < T.breathTo) return;          // 15s breathing room
   if (ENE.count() >= T.maxEnemies) return;
   let rate = 1.2 + Math.min(t, 600) / 50; if (t >= 240) rate *= 2; if (t >= 480) rate *= 1.4; if (G.boss || G.mini) rate *= 0.5;
@@ -311,7 +313,7 @@ function kill(e) {
   dropFood(e);
   if (d.onDeath === 'queja3') for (let i = 0; i < 3; i++) { const a = Math.atan2(G.p.y - e.y, G.p.x - e.x) + (i - 1) * 0.5; const q = spawnEnemy('queja', e.x, e.y); if (q) { q.vx = Math.cos(a); q.vy = Math.sin(a); q.life = 10; } }
   if (e.type === 'inspeccion') { G.mini = null; G.banner = { s: '¡INSPECCIÓN APROBADA! Sigue la Temporada Alta…', t: 3 }; sfx('lvl'); }
-  if (d.behavior === 'dueno') { G.boss = null; G.victory = true; G.banner = { s: '¡EL HOTEL ES TUYO!', t: 3 }; sfx('win'); for (const o of ENE.items) if (o.alive) o.alive = false; setTimeout(() => endRun(true), 1500); }
+  if (d.behavior === 'dueno') { G.duenoKillTime = G.t - (G.duenoT ?? G.t); G.boss = null; G.victory = true; G.banner = { s: '¡EL HOTEL ES TUYO!', t: 3 }; sfx('win'); for (const o of ENE.items) if (o.alive) o.alive = false; setTimeout(() => endRun(true), 1500); }
 }
 function drop(kind, x, y, v) { const p = PICK.get(); if (p) Object.assign(p, { kind, x, y, v, mag: false, food: null, life: 999 }); }
 
@@ -351,7 +353,9 @@ function duenoAI(e, dt) {
     else if (e.st === 'tele') { if (e.stT <= 0) { e.st = 'dash'; e.stT = C.dashTime; } }
     else if (e.st === 'dash') { e.vx = e.dx; e.vy = e.dy; e.x += e.dx * C.dashSpeed * dt; e.y += e.dy * C.dashSpeed * dt; if (e.stT <= 0) { e.st = 'rest'; e.stT = C.rest; } } }
 }
-function hurt(amt) { const P = G.p; if (P.inv > 0 || DBG.god || G.victory) return; P.hp -= Math.max(1, amt - P.armor); P.inv = 0.6; G.shake = 0.15; sfx('hurt'); if (P.hp <= 0) { P.hp = 0; endRun(false); } }
+function hurt(amt) { const P = G.p; if (P.inv > 0 || DBG.god || G.victory) return; P.hp -= Math.max(1, amt - P.armor); P.inv = 0.6; G.shake = 0.15; sfx('hurt');
+  const rv = G.char.bonus.revive; if (P.hp <= 0 && rv && !G.revived) { G.revived = true; P.hp = P.maxHp * rv; P.inv = 2; G.banner = { s: '¡RESCATE! Revivís al ' + Math.round(rv * 100) + '%', t: 2.5 }; sfx('lvl'); }
+  G.minHpFrac = Math.min(G.minHpFrac, Math.max(0, P.hp) / P.maxHp); if (P.hp <= 0) { P.hp = 0; endRun(false); } }
 
 // ---------------- projectiles / pickups / fx -------------
 function projUpdate(dt) {
@@ -410,7 +414,10 @@ function achMet(c) { const runK = G.committed ? 0 : G.kills, runKar = G.committe
   if (c.surviveSec) return G.t >= c.surviveSec; if (c.kill) return (G.killed[c.kill] || 0) > 0; if (c.win) return !!G.win; if (c.totalKills) return META.totalKills + runK >= c.totalKills;
   if (c.runKills) return G.kills >= c.runKills; if (c.evolveAny) return G.evolved.length > 0; if (c.evolve) return G.evolved.includes(c.evolve); if (c.eat) return (G.ate[c.eat] || 0) > 0;
   if (c.karens) return META.stats.karens + runKar >= c.karens; if (c.winAs) return !!G.win && G.char.id === c.winAs; if (c.fullBuild) return G.weapons.length >= 4 && G.passives.length >= 4;
-  if (c.wins) return META.wins >= c.wins; return false; }
+  if (c.wins) return META.wins >= c.wins;
+  if (c.evolveCount) return G.evolved.length >= c.evolveCount; if (c.winMinHp) return !!G.win && G.minHpFrac >= c.winMinHp; if (c.winNoFood) return !!G.win && !Object.keys(G.ate).length;
+  if (c.duenoUnder) return G.duenoKillTime != null && G.duenoKillTime < c.duenoUnder; if (c.winKills) return !!G.win && G.kills >= c.winKills;
+  if (c.allUnlocked) return D.characters.filter(ch => ch.unlock).every(ch => META.unlocked[ch.id]); return false; }
 function checkAch() { for (const a of D.achievements) if (!META.ach[a.id] && achMet(a.cond)) { const had = { ...META.unlocked }; grantAch(a.id); G.achNow.push(a.name);
   if (a.reward.unlock && !had[a.reward.unlock]) G.unlockedNow.push(D.characters.find(c => c.id === a.reward.unlock).name); } }
 function endRun(win) {
@@ -435,7 +442,8 @@ function update(dt) {
     const { mx, my } = P.input = readInput(P.inputSlot); const ml = Math.hypot(mx, my);
     if (ml > 0.01) { P.fx = mx / ml; P.fy = my / ml; P.moving = true; } else P.moving = false;
     P.x += (mx * P.speed + P.kbx) * dt; P.y += (my * P.speed + P.kby) * dt; P.kbx *= Math.pow(0.001, dt); P.kby *= Math.pow(0.001, dt);
-    P.anim += dt; P.inv -= dt; P.hp = Math.min(P.maxHp, P.hp + P.regen * dt);
+    P.anim += dt; P.inv -= dt; const bb = G.char.bonus; let rg = P.regen; if (bb.regenPctStill) rg += P.maxHp * (P.moving ? bb.regenPctMoving : bb.regenPctStill); P.hp = Math.min(P.maxHp, P.hp + rg * dt);
+    if (bb.trail && P.moving) { G.trailT -= dt; if (G.trailT <= 0) { G.trailT = bb.trail.every; const f = FX.get(); if (f) Object.assign(f, { kind: 'fire', trail: true, x: P.x, y: P.y + 6, t: 0, dur: bb.trail.dur, dps: bb.trail.dps, R: bb.trail.r, vx: 0 }); } }
   }
   G.shake -= dt;
   spawning(dt); weaponsUpdate(dt); projUpdate(dt); enemiesUpdate(dt); pickUpdate(dt); fxUpdate(dt);
@@ -480,7 +488,8 @@ function renderWorld() {
   if (G.t >= TLd().highSeason && !(G.boss && G.boss.alive)) { ctx.fillStyle = 'rgba(255,120,40,.07)'; ctx.fillRect(0, 0, W, H); }
   ctx.save(); ctx.translate(-cx, -cy);
   for (const f of FX.items) if (f.alive && f.kind === 'puddle') { ctx.globalAlpha = 1 - f.t / f.dur * 0.6; drawSpr('charco', f.x, f.y, 0, f.t); ctx.globalAlpha = 1; }
-  for (const f of FX.items) if (f.alive && f.kind === 'fire') { const sh = SHEET.llama_piso; if (sh) { ctx.globalAlpha = Math.min(1, (f.dur - f.t) * 2); for (let i = 0; i < 3; i++) drawAnim('llama_piso', f.x + (i - 1) * f.R * 0.6, f.y + 6, Math.floor((f.t + i * 0.3) * 8), false); ctx.globalAlpha = 1; } else { ctx.fillStyle = 'rgba(255,120,0,.4)'; ctx.beginPath(); ctx.arc(f.x, f.y, f.R, 0, 7); ctx.fill(); } }
+  for (const f of FX.items) if (f.alive && f.kind === 'fire' && f.trail) { ctx.fillStyle = `rgba(255,215,64,${0.35 * (1 - f.t / f.dur)})`; ctx.fillRect(f.x - 4, f.y - 2, 8, 4); }
+  for (const f of FX.items) if (f.alive && f.kind === 'fire' && !f.trail) { const sh = SHEET.llama_piso; if (sh) { ctx.globalAlpha = Math.min(1, (f.dur - f.t) * 2); for (let i = 0; i < 3; i++) drawAnim('llama_piso', f.x + (i - 1) * f.R * 0.6, f.y + 6, Math.floor((f.t + i * 0.3) * 8), false); ctx.globalAlpha = 1; } else { ctx.fillStyle = 'rgba(255,120,0,.4)'; ctx.beginPath(); ctx.arc(f.x, f.y, f.R, 0, 7); ctx.fill(); } }
   for (const k of PICK.items) if (k.alive) { const blink = k.food && k.life < 4 && Math.floor(k.life * 6) % 2; if (blink) continue;
     if (k.food) drawSpr(k.kind, k.x, k.y + Math.sin(G.t * 4 + k.x) * 1.5); else draw(SPR[k.kind], k.x, k.y + Math.sin(G.t * 5 + k.x) * 1.5); }
   for (const f of FX.items) if (f.alive && f.kind === 'ring') { const k = f.t / f.dur, R = f.r * (0.3 + 0.7 * k);

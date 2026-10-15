@@ -52,11 +52,8 @@
     "accent": "#f2c230",
     "hair": "#6b3b1a"
    },
-   "unlock": {
-    "ach": "media_jornada",
-    "text": "Sobreviví 5 min"
-   },
-   "price": 60,
+   "unlock": null,
+   "price": 0,
    "costumes": [
     "botones_gorra"
    ]
@@ -74,11 +71,8 @@
     "accent": "#222222",
     "hair": "#d9a066"
    },
-   "unlock": {
-    "ach": "matanza",
-    "text": "500 kills totales"
-   },
-   "price": 120,
+   "unlock": null,
+   "price": 0,
    "costumes": [
     "cocinero_gorro"
    ]
@@ -191,9 +185,9 @@
    "id": "bartender",
    "name": "Bartender",
    "weapon": "botella",
-   "bonusText": "+10% daño",
+   "bonusText": "+10% vel. ataque por arma nv5",
    "bonus": {
-    "dmg": 1.1
+    "cdPerMaxed": 0.1
    },
    "colors": {
     "uniform": "#222",
@@ -201,7 +195,8 @@
     "hair": "#333"
    },
    "unlock": {
-    "text": "Comprar"
+    "ach": "tres_evos",
+    "text": "3 evoluciones en una run"
    },
    "price": 180,
    "costumes": []
@@ -210,9 +205,9 @@
    "id": "salvavidas",
    "name": "Salvavidas",
    "weapon": "silbato",
-   "bonusText": "+20 vida máx",
+   "bonusText": "Revive 1 vez al 50% HP",
    "bonus": {
-    "hp": 20
+    "revive": 0.5
    },
    "colors": {
     "uniform": "#e2483d",
@@ -220,7 +215,8 @@
     "hair": "#d9a066"
    },
    "unlock": {
-    "text": "Comprar"
+    "ach": "sin_sustos",
+    "text": "Ganá sin bajar del 30% HP"
    },
    "price": 180,
    "costumes": []
@@ -229,9 +225,10 @@
    "id": "masajista",
    "name": "Masajista",
    "weapon": "piedras",
-   "bonusText": "+1 HP/s regeneración",
+   "bonusText": "Regen 1%/s quieto · 0.3%/s moviéndose",
    "bonus": {
-    "regen": 1.0
+    "regenPctStill": 0.01,
+    "regenPctMoving": 0.003
    },
    "colors": {
     "uniform": "#e8e0d0",
@@ -239,7 +236,8 @@
     "hair": "#222"
    },
    "unlock": {
-    "text": "Comprar"
+    "ach": "ayuno",
+    "text": "Ganá sin comer"
    },
    "price": 220,
    "costumes": []
@@ -248,9 +246,10 @@
    "id": "seguridad",
    "name": "Seguridad",
    "weapon": "baston",
-   "bonusText": "+3 armadura",
+   "bonusText": "+3 armadura · -10% velocidad",
    "bonus": {
-    "armor": 3
+    "armor": 3,
+    "speed": 0.9
    },
    "colors": {
     "uniform": "#111",
@@ -258,7 +257,8 @@
     "hair": "#111"
    },
    "unlock": {
-    "text": "Comprar"
+    "ach": "dueno_rapido",
+    "text": "Vencé al Dueño en <60s"
    },
    "price": 220,
    "costumes": []
@@ -267,9 +267,15 @@
    "id": "valet",
    "name": "Valet",
    "weapon": "auto",
-   "bonusText": "+15% velocidad",
+   "bonusText": "+25% velocidad · deja estela",
    "bonus": {
-    "speed": 1.15
+    "speed": 1.25,
+    "trail": {
+     "every": 0.12,
+     "dur": 1.2,
+     "dps": 8,
+     "r": 10
+    }
    },
    "colors": {
     "uniform": "#c4262e",
@@ -277,7 +283,8 @@
     "hair": "#3a2312"
    },
    "unlock": {
-    "text": "Comprar"
+    "ach": "valet_20k",
+    "text": "Ganá con 20.000+ kills"
    },
    "price": 260,
    "costumes": []
@@ -1129,7 +1136,8 @@
     "surviveSec": 60
    },
    "reward": {
-    "keys": 5
+    "keys": 5,
+    "costume": "recep_gala"
    }
   },
   {
@@ -1140,8 +1148,8 @@
     "surviveSec": 300
    },
    "reward": {
-    "unlock": "botones",
-    "costume": "recep_gala"
+    "keys": 100,
+    "costume": "botones_gorra"
    }
   },
   {
@@ -1187,19 +1195,19 @@
     "totalKills": 500
    },
    "reward": {
-    "unlock": "cocinero"
+    "keys": 150,
+    "costume": "cocinero_gorro"
    }
   },
   {
    "id": "masacre",
-   "name": "Lobby Despejado",
+   "name": "Mil Quejas",
    "desc": "1000 kills en una run",
    "cond": {
     "runKills": 1000
    },
    "reward": {
-    "costume": "botones_gorra",
-    "keys": 20
+    "keys": 300
    }
   },
   {
@@ -1210,7 +1218,6 @@
     "evolveAny": 1
    },
    "reward": {
-    "costume": "cocinero_gorro",
     "keys": 10
    }
   },
@@ -1271,14 +1278,80 @@
   },
   {
    "id": "tres_victorias",
-   "name": "Cadena Hotelera",
+   "name": "Empleado del Mes",
    "desc": "Ganá 3 runs",
    "cond": {
     "wins": 3
    },
    "reward": {
-    "unlock": "dueno",
-    "keys": 30
+    "keys": 300,
+    "unlock": "dueno"
+   }
+  },
+  {
+   "id": "tres_evos",
+   "name": "Happy Hour",
+   "desc": "3 evoluciones en una run",
+   "cond": {
+    "evolveCount": 3
+   },
+   "reward": {
+    "unlock": "bartender"
+   }
+  },
+  {
+   "id": "sin_sustos",
+   "name": "Bandera Verde",
+   "desc": "Ganá sin bajar del 30% de vida",
+   "cond": {
+    "winMinHp": 0.3
+   },
+   "reward": {
+    "unlock": "salvavidas"
+   }
+  },
+  {
+   "id": "ayuno",
+   "name": "Ayuno",
+   "desc": "Ganá sin comer nada",
+   "cond": {
+    "winNoFood": 1
+   },
+   "reward": {
+    "unlock": "masajista"
+   }
+  },
+  {
+   "id": "dueno_rapido",
+   "name": "Desalojo Exprés",
+   "desc": "Vencé al Dueño en menos de 60s",
+   "cond": {
+    "duenoUnder": 60
+   },
+   "reward": {
+    "unlock": "seguridad"
+   }
+  },
+  {
+   "id": "valet_20k",
+   "name": "Estacionamiento Lleno",
+   "desc": "Ganá con 20.000+ kills",
+   "cond": {
+    "winKills": 20000
+   },
+   "reward": {
+    "unlock": "valet"
+   }
+  },
+  {
+   "id": "plantel",
+   "name": "Plantel Completo",
+   "desc": "Desbloqueá los 10 personajes desbloqueables",
+   "cond": {
+    "allUnlocked": 1
+   },
+   "reward": {
+    "keys": 500
    }
   }
  ]
