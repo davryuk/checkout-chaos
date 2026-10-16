@@ -1,0 +1,2 @@
+{"name":"Check-Out Chaos","short_name":"Check-Out Chaos","start_url":"./","display":"fullscreen","orientation":"landscape","background_color":"#120c18","theme_color":"#120c18",
+ "icons":[{"src":"branding/icon_64.png","sizes":"64x64","type":"image/png"},{"src":"branding/icon_512.png","sizes":"512x512","type":"image/png","purpose":"any"}]}

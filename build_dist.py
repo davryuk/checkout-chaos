@@ -5,7 +5,7 @@ Run: python3 build_strings.py && python3 build_sprites.py && python3 build_dist.
 import os, re, sys, zipfile
 FULLV = '--full' in sys.argv  # optional: bake window.BUILD_FULL_VERSION=true and write *-full.zip (not used for the demo release)
 H = os.path.dirname(os.path.abspath(__file__)); OUT = os.path.join(H, 'dist'); os.makedirs(OUT, exist_ok=True)
-FILES = ['storage.js', 'platform.js', 'analytics.js', 'strings.js', 'data.js', 'data.json', 'sprites.js', 'game.js']
+FILES = ['storage.js', 'platform.js', 'analytics.js', 'strings.js', 'data.js', 'data.json', 'sprites.js', 'game.js', 'manifest.webmanifest', 'branding/icon_64.png', 'branding/icon_512.png']
 html = open(os.path.join(H, 'index.html'), encoding='utf-8').read()
 assert not re.search(r'(src|href)="(https?:)?//', html), 'index.html must not reference external URLs'
 for plat, name in [('poki', 'checkout-chaos-poki.zip'), ('crazygames', 'checkout-chaos-crazygames.zip'), ('none', 'checkout-chaos-web.zip')]:

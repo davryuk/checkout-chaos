@@ -590,6 +590,8 @@ function update(dt) {
 // ---------------- render helpers -------------
 function draw(spr, x, y, flip, s = 1) { const w = spr.width * s, h = spr.height * s; if (flip) { ctx.save(); ctx.translate(Math.round(x), 0); ctx.scale(-1, 1); ctx.drawImage(spr, Math.round(-w / 2), Math.round(y - h / 2), w, h); ctx.restore(); } else ctx.drawImage(spr, Math.round(x - w / 2), Math.round(y - h / 2), w, h); }
 const SHEET = {};
+const UI = {};
+function loadUI() { const S = window.UI_IMAGES || {}; return Promise.all(Object.keys(S).map(k => new Promise(res => { const img = new Image(); img.onload = () => { UI[k] = img; res(); }; img.onerror = () => res(); img.src = S[k]; }))); }
 function loadSheets() { const S = window.SPRITE_SHEETS || {}; return Promise.all(Object.keys(S).map(k => new Promise(res => { const img = new Image();
   img.onload = () => { SHEET[k] = { img, fs: S[k].fs, fw: S[k].fw || S[k].fs, n: S[k].frames, ax: S[k].anchor[0], ay: S[k].anchor[1] }; res(); }; img.onerror = () => res(); img.src = S[k].src; }))); }
 function buildExtraSprites() {
@@ -759,16 +761,20 @@ function renderMenu() {
   for (let y = 0; y < H; y += 64) for (let x = 0; x < W; x += 64) { ctx.globalAlpha = 0.25; ctx.drawImage(SPR.tile, x, y); ctx.globalAlpha = 1; }
   btn(W - 58, 4, 54, 14, LANG === 'es' ? 'ES | en' : 'es | EN', () => setLang(LANG === 'es' ? 'en' : 'es'), { size: 6 });
   const wl = WISHLIST_URL(); if (wl) btn(4, 4, 84, 14, tr('Wishlist en Steam'), () => { track('wishlist_click', { from: 'menu' }); PLATFORM.openLink(wl); }, { size: 5 });
-  txt('CHECK-OUT CHAOS', W / 2, 24, 16, '#f2c230', 'center'); if (!FULL()) txt(tr('DEMO'), W / 2 + 88, 18, 7, '#c58cff', 'left'); txt(tr('v2 · Sobreviví 15 minutos de Temporada Alta'), W / 2, 36, 6, '#ccc', 'center');
-  txt('🔑 ' + META.keys + '   ☠ ' + META.totalKills + tr('   mejor ') + fmt(META.bestTime) + '   🏆 ' + Object.keys(META.ach).length + '/' + D.achievements.length, W / 2, 48, 7, '#ffd23f', 'center');
-  const cs = D.characters, perRow = Math.ceil(cs.length / 2), cw = Math.min(64, (W - 16) / perRow - 4), chh = 66, y0 = 54;
+  if (UI.title) { ctx.imageSmoothingEnabled = false; ctx.drawImage(UI.title, 0, 60, 864, 480, W / 2 - 72, 3, 144, 80); } // pixel-art logo (6x source -> native 144x80)
+  else txt('CHECK-OUT CHAOS', W / 2, 40, 16, '#f2c230', 'center');
+  if (!FULL()) txt(tr('DEMO'), W / 2 + 76, 78, 7, '#c58cff', 'left');
+  txt(tr('v2 · Sobreviví 15 minutos de Temporada Alta').replace(/^v2 · /, ''), W / 2 - 80, 44, 6, '#ccc', 'right');
+  txt('🔑 ' + META.keys + '   ☠ ' + META.totalKills, W / 2 + 80, 38, 7, '#ffd23f', 'left');
+  txt(tr('   mejor ').trim() + ' ' + fmt(META.bestTime) + '   🏆 ' + Object.keys(META.ach).length + '/' + D.achievements.length, W / 2 + 80, 50, 7, '#ffd23f', 'left');
+  const cs = D.characters, perRow = Math.ceil(cs.length / 2), cw = Math.min(64, (W - 16) / perRow - 4), chh = 56, y0 = 86;
   cs.forEach((c, i) => { const row = Math.floor(i / perRow), col = i % perRow, n = Math.min(perRow, cs.length - row * perRow);
     const x = W / 2 + (col - (n - 1) / 2) * (cw + 4) - cw / 2, y = y0 + row * (chh + 4), un = playable(c.id), lockedFull = !un && !canUnlock(c.id), sel = MENU_PEEK ? MENU_PEEK === c.id : META.sel === c.id;
     buttons.push({ x, y, w: cw, h: chh, fn: () => { MENU_PEEK = un ? null : c.id; if (un) META.sel = c.id; else if (lockedFull) { sfx('hurt'); } else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.sel = c.id; sfx('key'); track('character_unlocked', { id: c.id, via: 'keys', price: c.price }); } saveMeta(); } });
     ctx.fillStyle = sel ? '#3a2f5a' : '#241c33'; ctx.fillRect(x, y, cw, chh); ctx.strokeStyle = sel ? '#f2c230' : '#554'; ctx.strokeRect(x + .5, y + .5, cw - 1, chh - 1);
-    ctx.globalAlpha = un ? 1 : 0.3; drawAnim(playerKey(c.id, META.costumeSel[c.id]), x + cw / 2, y + 44, animFrame(sel, performance.now() / 1000), false, 1.25); ctx.globalAlpha = 1;
-    txt(c.name.length > 12 ? c.name.slice(0, 11) + '.' : c.name, x + cw / 2, y + 54, 5, '#fff', 'center');
-    if (lockedFull) txt('🔒 ' + tr('Completa'), x + cw / 2, y + 63, 5, '#c58cff', 'center'); else if (!un) txt('🔒 ' + c.price + '🔑', x + cw / 2, y + 63, 5, META.keys >= c.price ? '#3fdc5a' : '#ff7bc2', 'center'); else txt(D.weapons[c.weapon].name.slice(0, 14), x + cw / 2, y + 63, 4, '#f2c230', 'center'); });
+    ctx.globalAlpha = un ? 1 : 0.3; drawAnim(playerKey(c.id, META.costumeSel[c.id]), x + cw / 2, y + 38, animFrame(sel, performance.now() / 1000), false, 1.1); ctx.globalAlpha = 1;
+    txt(c.name.length > 12 ? c.name.slice(0, 11) + '.' : c.name, x + cw / 2, y + 46, 5, '#fff', 'center');
+    if (lockedFull) txt('🔒 ' + tr('Completa'), x + cw / 2, y + 54, 5, '#c58cff', 'center'); else if (!un) txt('🔒 ' + c.price + '🔑', x + cw / 2, y + 54, 5, META.keys >= c.price ? '#3fdc5a' : '#ff7bc2', 'center'); else txt(D.weapons[c.weapon].name.slice(0, 14), x + cw / 2, y + 54, 4, '#f2c230', 'center'); });
   const sc = D.characters.find(c => c.id === (MENU_PEEK || META.sel)) || cs[0]; let y = y0 + 2 * (chh + 4) + 4;
   txt(sc.name + ' — ' + D.weapons[sc.weapon].name + ' (' + D.weapons[sc.weapon].desc + ') · ' + sc.bonusText, W / 2, y + 6, 6, '#fff', 'center');
   if (!playable(sc.id) && !canUnlock(sc.id)) txt(tr('Disponible en la versión completa'), W / 2, y + 15, 6, '#c58cff', 'center'); else if (!META.unlocked[sc.id] && sc.unlock) txt(tr('Desbloqueo: ') + sc.unlock.text + tr(' o ') + sc.price + tr(' llaves'), W / 2, y + 15, 6, '#ff7bc2', 'center');
@@ -831,7 +837,7 @@ function frame(ts) {
 }
 
 (async function boot() {
-  resize(); await PLATFORM.init(); PLATFORM.loadingStart(); D = await loadData(); applyLang(); buildSprites(); buildExtraSprites(); loadMeta(); await loadSheets();
+  resize(); await PLATFORM.init(); PLATFORM.loadingStart(); D = await loadData(); applyLang(); buildSprites(); buildExtraSprites(); loadMeta(); await loadSheets(); await loadUI();
   ENE = new Pool(D.timeline.maxEnemies + 60, () => ({})); PROJ = new Pool(500, () => ({})); PICK = new Pool(700, () => ({})); FX = new Pool(500, () => ({}));
   window.CC = { get G() { return G; }, get screen() { return screen; }, get META() { return META; }, enemies: () => ENE.count(), fusionEligible: () => fusionEligible(), doFusion: id => doFusion(D.fusions.find(f => f.id === id)), openChest: () => openChest(), slotsOpen: () => slotsOpen(), WS: id => WS(G.weapons.find(w => w.id === id)), sheets: () => Object.keys(SHEET), foodCount, choose, newRun, addWeapon: id => addWeapon(id), addPassive: id => addPassive(id), recalc: () => recalcPassives(), DBG };
   window.CC.setLang = setLang; window.CC.playable = id => playable(id); window.CC.grantAch = id => grantAch(id); window.CC.FULL = () => FULL(); window.CC.loadMeta = () => loadMeta(); window.CC.lang = () => LANG; window.CC.tr = tr; window.CC.D = () => D;
