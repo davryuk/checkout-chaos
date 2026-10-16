@@ -2575,5 +2575,9 @@
   "Las burbujas y las toallas sueñan con el mar.",
   "Un cofre violeta guarda algo más que una mejora.",
   "Dos armas maestras pueden fundirse en una leyenda."
- ]
+ ],
+ "links": {
+  "wishlist": "",
+  "_comment": "Set wishlist to the Steam store URL once the Coming Soon page exists; the menu button only shows when non-empty (and on Poki only via PokiSDK.openExternalLink)."
+ }
 }

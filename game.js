@@ -5,6 +5,23 @@ const Q = new URLSearchParams(location.search);
 const DBG = { speed: +Q.get('speed') || 1, t: +Q.get('t') || 0, god: Q.get('god') === '1', dmg: +Q.get('dmg') || 1 };
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 let D = null, W = 640, H = 360, SC = 2;
+const STORE = window.STORE, PLATFORM = window.PLATFORM, track = (e, p) => { try { window.ANALYTICS && window.ANALYTICS.track(e, p); } catch (err) { } };
+// ---------------- i18n: Spanish literals are the keys; STRINGS.ui.en maps them to English. Data text gets an EN overlay by path. -------------
+const LANG_KEY = 'checkoutChaos.lang';
+let LANG = (() => { const q = Q.get('lang'); if (q === 'es' || q === 'en') return q; const s = STORE.get(LANG_KEY); if (s === 'es' || s === 'en') return s;
+  return /^es\b/i.test(navigator.language || '') ? 'es' : 'en'; })();
+window.LANG = LANG;
+const STR = window.STRINGS || { ui: { en: {} }, data: { en: {} } };
+function tr(s) { if (LANG === 'es') return s; const v = STR.ui[LANG] && STR.ui[LANG][s]; return v == null ? s : v; }
+let DATA_ES = null;
+function dataTarget(path) { const p = path.split('.'); let o = D;
+  for (let i = 0; i < p.length - 1; i++) { const k = p[i]; if (Array.isArray(o)) { o = /^\d+$/.test(k) ? o[+k] : o.find(x => x.id === k); } else o = o && o[k]; if (!o) return null; }
+  return [o, p[p.length - 1]]; }
+function applyLang() { const tbl = (STR.data && STR.data.en) || {};
+  if (!DATA_ES) { DATA_ES = {}; for (const k in tbl) { const t = dataTarget(k); if (t) DATA_ES[k] = t[0][t[1]]; } }
+  for (const k in DATA_ES) { const t = dataTarget(k); if (t) t[0][t[1]] = LANG === 'en' ? tbl[k] : DATA_ES[k]; }
+  document.documentElement.lang = LANG; window.LANG = LANG; }
+function setLang(l) { LANG = l; STORE.set(LANG_KEY, l); applyLang(); }
 
 // ---------------- data load (fetch JSON, fallback to embedded JS) -------------
 async function loadData() {
@@ -14,14 +31,16 @@ async function loadData() {
 }
 
 // ---------------- resize -------------
+// Fixed 16:9 logical view (640x360), letterboxed and centered. Backing store is an integer multiple (crisp nearest-neighbor);
+// CSS scales it to fit. Safe-area insets are respected via CSS padding on body.
 function resize() {
-  const w = innerWidth, h = innerHeight;
-  SC = Math.max(1, Math.floor(Math.min(w / 400, h / 300)));
-  if (Math.min(w, h) < 500) SC = Math.max(1, Math.floor(Math.min(w, h) / 260));
-  W = Math.ceil(w / SC); H = Math.ceil(h / SC);
-  cv.width = W * SC; cv.height = H * SC; cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  const cs = getComputedStyle(document.body), padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0), padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  const w = Math.max(1, innerWidth - padX), h = Math.max(1, innerHeight - padY), fit = Math.min(w / W, h / H), dpr = window.devicePixelRatio || 1;
+  SC = Math.max(1, Math.ceil(fit * dpr)); cv.width = W * SC; cv.height = H * SC;
+  cv.style.width = Math.floor(W * fit) + 'px'; cv.style.height = Math.floor(H * fit) + 'px';
+  document.body.classList.toggle('portrait', innerHeight > innerWidth * 1.1);
 }
-addEventListener('resize', resize);
+addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 100));
 
 // ---------------- sprites (code-generated 32x32 pixel art) -------------
 const SPR = {};
@@ -86,6 +105,7 @@ function buildSprites() {
 
 // ---------------- audio (WebAudio synth) -------------
 const AU = { ctx: null, master: null, mus: null, on: true };
+function audible() { return AU.on && !(PLATFORM && PLATFORM.muted); }
 function audioInit() {
   if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
   try { AU.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
@@ -94,7 +114,7 @@ function audioInit() {
   startMusic();
 }
 function tone(f, d, type = 'square', vol = 0.15, slide = 0, dest) {
-  if (!AU.ctx || !AU.on) return; const t = AU.ctx.currentTime, o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+  if (!AU.ctx || !audible()) return; const t = AU.ctx.currentTime, o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
   o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); o.connect(g); g.connect(dest || AU.master); o.start(t); o.stop(t + d + 0.02);
 }
@@ -135,14 +155,14 @@ function startMusic() {
 function note(f, t, d, type, v) { const o = AU.ctx.createOscillator(), g = AU.ctx.createGain(); o.type = type; o.frequency.value = f;
   g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d); o.connect(g); g.connect(AU.mus); o.start(t); o.stop(t + d + 0.02); }
 
-// ---------------- meta (localStorage, v2 with v1 migration; v1 key is never deleted) -------------
+// ---------------- meta (STORE wrapper, v2 with v1 migration; v1 key is never deleted) -------------
 const META_KEY_V1 = 'checkoutChaos.meta.v1', META_KEY = 'checkoutChaos.meta.v2';
 let META;
 function metaDefaults() { return { v: 3, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true, botones: true, cocinero: true }, shop: { hp: 0, dmg: 0, reroll: 0, banish: 0 }, sel: 'recep', book: { revealed: {}, fused: {} },
   ach: {}, costumes: {}, costumeSel: {}, stats: { karens: 0, winsAs: {}, lifetimeKeys: 0 }, migratedFromV1: false }; }
 function loadMeta() {
-  let m = null; try { m = JSON.parse(localStorage.getItem(META_KEY)); } catch (e) { }
-  if (!m) { let old = null; try { old = JSON.parse(localStorage.getItem(META_KEY_V1)); } catch (e) { }
+  let m = STORE.getJSON(META_KEY);
+  if (!m) { let old = STORE.getJSON(META_KEY_V1);
     m = metaDefaults();
     if (old) { Object.assign(m, { keys: old.keys || 0, totalKills: old.totalKills || 0, bestTime: old.bestTime || 0, runs: old.runs || 0, wins: 0, sel: old.sel || 'recep' });
       m.unlocked = Object.assign(m.unlocked, old.unlocked || {}); m.shop = Object.assign(m.shop, old.shop || {}); m.migratedFromV1 = true;
@@ -153,13 +173,13 @@ function loadMeta() {
     if (r.v1wins > 0) grantAch('inspeccion', true); if (META.totalKills >= 500) grantAch('matanza', true); }
   for (const c of D.characters) if (!c.unlock) META.unlocked[c.id] = true;
   saveMeta(); }
-function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(META)); } catch (e) { } }
+function saveMeta() { STORE.setJSON(META_KEY, META); }
 let achToast = [];
 function grantAch(id, silent) {
-  if (META.ach[id]) return; const a = D.achievements.find(a => a.id === id); if (!a) return; META.ach[id] = Date.now(); const r = a.reward;
+  if (META.ach[id]) return; const a = D.achievements.find(a => a.id === id); if (!a) return; META.ach[id] = Date.now(); const r = a.reward; track('achievement_unlocked', { id, silent: !!silent }); if (r.unlock && !META.unlocked[r.unlock]) track('character_unlocked', { id: r.unlock, via: 'achievement' });
   if (r.keys) { META.keys += r.keys; META.stats.lifetimeKeys += r.keys; } if (r.unlock) META.unlocked[r.unlock] = true; if (r.costume) META.costumes[r.costume] = true;
   saveMeta(); if (!silent) { achToast.push({ s: '🏆 ' + a.name, sub: rewardText(r), t: 3.5 }); sfx('lvl'); } }
-function rewardText(r) { const o = []; if (r.keys) o.push('+' + r.keys + ' llaves'); if (r.unlock) o.push('desbloquea ' + D.characters.find(c => c.id === r.unlock).name); if (r.costume) o.push('traje ' + D.costumes[r.costume].name); return o.join(' · '); }
+function rewardText(r) { const o = []; if (r.keys) o.push('+' + r.keys + tr(' llaves')); if (r.unlock) o.push(tr('desbloquea ') + D.characters.find(c => c.id === r.unlock).name); if (r.costume) o.push(tr('traje ') + D.costumes[r.costume].name); return o.join(' · '); }
 
 // ---------------- input -------------
 const keys = {}; const JOY = { active: false, id: null, sx: 0, sy: 0, x: 0, y: 0 };
@@ -207,14 +227,14 @@ function newRun(charId) {
   Object.defineProperty(G, 'p', { get() { return this.players[0]; } });
   G.p.hp = G.p.maxHp; recalcPassives();
   for (const P of [ENE, PROJ, PICK, FX]) P.items.forEach(o => o.alive = false);
-  addWeapon(ch.weapon); screen = 'play'; META.runs++; saveMeta();
+  addWeapon(ch.weapon); screen = 'play'; META.runs++; saveMeta(); G.minSent = {}; track('run_start', { character: ch.id, outfit: META.costumeSel[ch.id] || 'classic', run: META.runs });
   if (DBG.t) { const T = TLd(); while (G.nextElite < DBG.t) G.nextElite += G.nextElite >= T.highSeason ? T.eliteEveryHS : T.eliteEvery; while (G.nextConga < DBG.t) G.nextConga += T.congaEvery;
     if (DBG.t > T.inspAt + 1) G.inspSpawned = true; }
 }
 function addWeapon(id) { const LR = D.levelRules; let w = G.weapons.find(w => w.id === id); if (w) w.lvl = Math.min(LR.maxLevel, w.lvl + 1); else G.weapons.push(w = { id, lvl: 1, a: 0, cd: 0 });
   const S = D.weapons[id]; if (G.players) recalcPassives();
-  if (w.lvl >= LR.evoLevel && S.evo && !w.evo) { w.evo = true; G.evolved.push(id); if (!META.book.revealed[id + ':w']) { META.book.revealed[id + ':w'] = 1; saveMeta(); } G.banner = { s: '¡EVOLUCIÓN: ' + S.evo.name.toUpperCase() + '!', t: 3 }; sfx('win'); }
-  if (w.lvl === LR.maxLevel && !G.mastered.includes(id)) { G.mastered.push(id); G.banner = { s: '★ MAESTRÍA: ' + (w.evo ? S.evo.name : S.name), t: 2.5 }; } }
+  if (w.lvl >= LR.evoLevel && S.evo && !w.evo) { w.evo = true; G.evolved.push(id); if (!META.book.revealed[id + ':w']) { META.book.revealed[id + ':w'] = 1; saveMeta(); } G.banner = { s: tr('¡EVOLUCIÓN: ') + S.evo.name.toUpperCase() + '!', t: 3 }; sfx('win'); }
+  if (w.lvl === LR.maxLevel && !G.mastered.includes(id)) { G.mastered.push(id); G.banner = { s: tr('★ MAESTRÍA: ') + (w.evo ? S.evo.name : S.name), t: 2.5 }; } }
 function addPassive(id) { let p = G.passives.find(p => p.id === id); if (p) p.lvl = Math.min(D.passives[id].maxLevel || 5, p.lvl + 1); else G.passives.push(p = { id, lvl: 1 });
   if (p.lvl >= 5 && !META.book.revealed[id + ':p']) { META.book.revealed[id + ':p'] = 1; saveMeta(); } recalcPassives(); }
 function passiveSum(stat) { let s = 0; for (const p of G.passives) { const per = D.passives[p.id].per; if (per[stat] != null) s += per[stat] * p.lvl; } return s; }
@@ -246,11 +266,11 @@ function spawnEnemy(type, x, y, extra) {
   if (extra) Object.assign(e, extra); return e;
 }
 function edgePos(margin = 30) { const a = Math.random() * Math.PI * 2, R = Math.hypot(W, H) / 2 + margin; return { x: G.p.x + Math.cos(a) * R, y: G.p.y + Math.sin(a) * R }; }
-function phaseName() { const T = TLd(), t = G.t; if (G.boss && G.boss.alive) return 'JEFE FINAL'; if (t >= T.breathFrom && t < T.breathTo) return 'RESPIRO'; if (t >= T.highSeason) return 'TEMPORADA ALTA'; return ''; }
+function phaseName() { const T = TLd(), t = G.t; if (G.boss && G.boss.alive) return tr('JEFE FINAL'); if (t >= T.breathFrom && t < T.breathTo) return tr('RESPIRO'); if (t >= T.highSeason) return tr('TEMPORADA ALTA'); return ''; }
 function spawning(dt) {
   const t = G.t, T = TLd(); if (G.victory) return;
-  if (!G.inspSpawned && t >= T.inspAt) { G.inspSpawned = true; const p = edgePos(10); G.mini = spawnEnemy('inspeccion', p.x, p.y); sfx('boss'); G.banner = { s: '¡LLEGÓ LA INSPECCIÓN! · TEMPORADA ALTA', t: 3 }; }
-  if (!G.duenoSpawned && t >= T.dueAt) { G.duenoSpawned = true; const p = edgePos(10); G.boss = spawnEnemy('dueno', p.x, p.y); G.duenoT = t; sfx('boss'); G.banner = { s: '¡EL DUEÑO DEL HOTEL!', t: 3 }; }
+  if (!G.inspSpawned && t >= T.inspAt) { G.inspSpawned = true; const p = edgePos(10); G.mini = spawnEnemy('inspeccion', p.x, p.y); sfx('boss'); G.banner = { s: tr('¡LLEGÓ LA INSPECCIÓN! · TEMPORADA ALTA'), t: 3 }; }
+  if (!G.duenoSpawned && t >= T.dueAt) { G.duenoSpawned = true; const p = edgePos(10); G.boss = spawnEnemy('dueno', p.x, p.y); G.duenoT = t; sfx('boss'); G.banner = { s: tr('¡EL DUEÑO DEL HOTEL!'), t: 3 }; }
   if (t >= T.breathFrom && t < T.breathTo) return;          // 15s breathing room
   if (ENE.count() >= T.maxEnemies) return;
   let rate = 1.2 + Math.min(t, 600) / 50; if (t >= 240) rate *= 2; if (t >= 480) rate *= 1.4; if (G.boss || G.mini) rate *= 0.5;
@@ -353,8 +373,8 @@ function kill(e) {
   const k = d.keys || (Math.random() < 0.012 * (1 + G.p.luck * 4) ? 1 : 0); for (let i = 0; i < k; i++) drop('key', e.x + rnd(-14, 14), e.y + rnd(-14, 14), 1);
   dropFood(e);
   if (d.onDeath === 'queja3') for (let i = 0; i < 3; i++) { const a = Math.atan2(G.p.y - e.y, G.p.x - e.x) + (i - 1) * 0.5; const q = spawnEnemy('queja', e.x, e.y); if (q) { q.vx = Math.cos(a); q.vy = Math.sin(a); q.life = 10; } }
-  if (e.type === 'inspeccion') { G.mini = null; G.banner = { s: '¡INSPECCIÓN APROBADA! Sigue la Temporada Alta…', t: 3 }; sfx('lvl'); }
-  if (d.behavior === 'dueno') { G.duenoKillTime = G.t - (G.duenoT ?? G.t); G.boss = null; G.victory = true; G.banner = { s: '¡EL HOTEL ES TUYO!', t: 3 }; sfx('win'); for (const o of ENE.items) if (o.alive) o.alive = false; setTimeout(() => endRun(true), 1500); }
+  if (e.type === 'inspeccion') { G.mini = null; G.banner = { s: tr('¡INSPECCIÓN APROBADA! Sigue la Temporada Alta…'), t: 3 }; sfx('lvl'); }
+  if (d.behavior === 'dueno') { G.duenoKillTime = G.t - (G.duenoT ?? G.t); G.boss = null; G.victory = true; G.banner = { s: tr('¡EL HOTEL ES TUYO!'), t: 3 }; sfx('win'); for (const o of ENE.items) if (o.alive) o.alive = false; setTimeout(() => endRun(true), 1500); }
 }
 function drop(kind, x, y, v) { const p = PICK.get(); if (p) Object.assign(p, { kind, x, y, v, mag: false, food: null, life: 999 }); }
 
@@ -391,14 +411,14 @@ function duenoAI(e, dt) {
   const chase = k => { const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1; e.vx = dx / d; e.vy = dy / d; e.x += e.vx * e.spd * k * dt; e.y += e.vy * e.spd * k * dt; };
   if (e.phase < 3) { chase(1); e.tA += dt; const every = e.phase === 1 ? C.spiralEvery : C.spiralEvery2;
     while (e.tA > every) { e.tA -= every; e.spiral += 0.37; const arms = e.phase === 1 ? 1 : 2; for (let k = 0; k < arms; k++) enemyShot(e, e.spiral + k * Math.PI, C.bulletSpeed, C.bulletDmg, 'billete'); e.atkT = 0.3; }
-    if (e.phase === 2) { e.tB += dt; if (e.tB > C.summonEvery || !e.summoned) { e.tB = 0; e.summoned = true; for (let i = 0; i < C.summonCount; i++) { const a = i * Math.PI / 2; spawnEnemy('abogado', e.x + Math.cos(a) * 60, e.y + Math.sin(a) * 60); } G.banner = { s: '¡Llamó a sus abogados!', t: 1.5 }; } } }
-  else { e.stT -= dt; if (!e.p3) { e.p3 = true; e.st = 'rest'; e.stT = 0.5; G.banner = { s: '¡EL DUEÑO ESTÁ FURIOSO!', t: 2 }; }
+    if (e.phase === 2) { e.tB += dt; if (e.tB > C.summonEvery || !e.summoned) { e.tB = 0; e.summoned = true; for (let i = 0; i < C.summonCount; i++) { const a = i * Math.PI / 2; spawnEnemy('abogado', e.x + Math.cos(a) * 60, e.y + Math.sin(a) * 60); } G.banner = { s: tr('¡Llamó a sus abogados!'), t: 1.5 }; } } }
+  else { e.stT -= dt; if (!e.p3) { e.p3 = true; e.st = 'rest'; e.stT = 0.5; G.banner = { s: tr('¡EL DUEÑO ESTÁ FURIOSO!'), t: 2 }; }
     if (e.st === 'rest') { chase(0.6); if (e.stT <= 0) { e.st = 'tele'; e.stT = C.telegraph; const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1; e.dx = dx / d; e.dy = dy / d; sfx('hurt'); } }
     else if (e.st === 'tele') { if (e.stT <= 0) { e.st = 'dash'; e.stT = C.dashTime; } }
     else if (e.st === 'dash') { e.vx = e.dx; e.vy = e.dy; e.x += e.dx * C.dashSpeed * dt; e.y += e.dy * C.dashSpeed * dt; if (e.stT <= 0) { e.st = 'rest'; e.stT = C.rest; } } }
 }
 function hurt(amt) { const P = G.p; if (P.inv > 0 || DBG.god || G.victory) return; P.hp -= Math.max(1, amt - P.armor); P.inv = 0.6; G.shake = 0.15; sfx('hurt');
-  const rv = G.char.bonus.revive; if (P.hp <= 0 && rv && !G.revived) { G.revived = true; P.hp = P.maxHp * rv; P.inv = 2; G.banner = { s: '¡RESCATE! Revivís al ' + Math.round(rv * 100) + '%', t: 2.5 }; sfx('lvl'); }
+  const rv = G.char.bonus.revive; if (P.hp <= 0 && rv && !G.revived) { G.revived = true; P.hp = P.maxHp * rv; P.inv = 2; G.banner = { s: tr('¡RESCATE! Revivís al ') + Math.round(rv * 100) + '%', t: 2.5 }; sfx('lvl'); }
   G.minHpFrac = Math.min(G.minHpFrac, Math.max(0, P.hp) / P.maxHp); if (P.hp <= 0) { P.hp = 0; endRun(false); } }
 
 // ---------------- projectiles / pickups / fx -------------
@@ -452,7 +472,7 @@ function fusionsUpdate(dt) { const P = G.p; G.frozenMul = 0; G.spaR = 0; G.quarR
       case 'banquete': st.a = (st.a || 0) + 4 * dt; if (every('k', Q.every)) { const a = st.a; fireProj({ w: 'fus', S: { healOnKill: Q.healOnKill }, spr: 'cuchillo', x: P.x, y: P.y, vx: Math.cos(a) * Q.speed, vy: Math.sin(a) * Q.speed, dmg: Q.dmg, life: 1.4, r: 5, pierce: 2, ang: a, rotTo: true }); } break;
       case 'apagon': if (every('a', Q.every)) G.dark = Q.dur; if (G.dark > 0) for (const e of ENE.items) if (e.alive && dist2(e, P) > (Q.R * P.area) ** 2) { const big = e.d.behavior === 'dueno' || e.d.behavior === 'boss'; damage(e, (big ? Q.bossDps : Q.dps) * dt, null, 0); } break;
       case 'checkout': if (every('c', Q.every)) { const vis = ENE.items.filter(e => e.alive && !e.d.elite && e.d.behavior !== 'dueno' && e.d.behavior !== 'boss' && Math.abs(e.x - P.x) < W / 2 && Math.abs(e.y - P.y) < H / 2);
-        const n = Math.floor(vis.length * Q.pct); for (let i = 0; i < n; i++) { const e = vis.splice(Math.floor(Math.random() * vis.length), 1)[0]; const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'poof', x: e.x, y: e.y, t: 0, dur: 0.4, vx: 0 }); kill(e); } G.banner = { s: 'CHECK-OUT FORZADO: -' + n, t: 1.2 }; } break;
+        const n = Math.floor(vis.length * Q.pct); for (let i = 0; i < n; i++) { const e = vis.splice(Math.floor(Math.random() * vis.length), 1)[0]; const fx2 = FX.get(); if (fx2) Object.assign(fx2, { kind: 'poof', x: e.x, y: e.y, t: 0, dur: 0.4, vx: 0 }); kill(e); } G.banner = { s: tr('CHECK-OUT FORZADO: -') + n, t: 1.2 }; } break;
       case 'tsunami': if (every('w', Q.every)) { st.wx = P.x - W / 2 - 40; st.on = true; }
         if (st.on) { st.wx += Q.speed * dt; for (const e of ENE.items) if (e.alive && Math.abs(e.x - st.wx) < 20 && Math.abs(e.y - P.y) < H / 2) { if (e.hits.tsu === F.t) continue; if (!(e.hits.tsuW > G.t)) { e.hits.tsuW = G.t + 3; damage(e, Q.dmg, null, 0); e.kb = 0.2; e.kbx = Q.kb; e.kby = 0; } } if (st.wx > P.x + W / 2 + 40) st.on = false; } break;
     } }
@@ -487,9 +507,9 @@ function nChoices() { return G.char.id === 'gerente' ? D.run.choicesGerente : D.
 function rollChoices() { const pool = upgradePool(); const c = []; while (c.length < nChoices() && pool.length) c.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   if (!c.length) c.push({ kind: 'heal' }, { kind: 'keys' }); G.choices = c; }
 function levelUp() { G.xp -= G.xpNext; G.lvl++; G.xpNext = Math.floor(5 + G.lvl * 4 + G.lvl * G.lvl * 0.35); G.state = 'levelup'; G.banishMode = false; rollChoices(); sfx('lvl');
-  if (D.run.slotOpenLevels.includes(G.lvl)) G.banner = { s: '¡NUEVO SLOT! (' + slotsOpen() + '+' + slotsOpen() + ')', t: 2.5 }; }
+  if (D.run.slotOpenLevels.includes(G.lvl)) G.banner = { s: tr('¡NUEVO SLOT! (') + slotsOpen() + '+' + slotsOpen() + ')', t: 2.5 }; }
 function applyChoice(c) { if (c.kind === 'w') addWeapon(c.id); else if (c.kind === 'p') addPassive(c.id); else if (c.kind === 'heal') G.p.hp = G.p.maxHp; else G.keys += 2; }
-function choose(i) { const c = G.choices && G.choices[i]; if (!c) return;
+function choose(i) { const c = G.choices && G.choices[i]; if (!c) return; if (!G.banishMode) track('level_up_choice', { kind: c.kind, id: c.id || null, lvl: c.lvl || null, playerLevel: G.lvl, options: G.choices.map(o => o.id || o.kind) });
   if (G.banishMode) { if (c.kind === 'w' || c.kind === 'p') { G.banished[c.kind + ':' + c.id] = 1; G.banishLeft--; G.banishMode = false; const pool = upgradePool().filter(o => !G.choices.some(x => x.kind === o.kind && x.id === o.id));
       if (pool.length) G.choices[i] = pool[Math.floor(Math.random() * pool.length)]; else G.choices.splice(i, 1); if (!G.choices.length) rollChoices(); sfx('hurt'); } return; }
   applyChoice(c); G.choices = null; G.state = 'play'; if (G.xp >= G.xpNext) levelUp(); }
@@ -501,15 +521,15 @@ function fusionEligible() { const FR = D.fusionRules; if (G.fusions.length >= FR
   return D.fusions.filter(f => { if (fusionHas(f) || (f.rare && rareUsed >= FR.maxRarePerRun)) return false;
     const ws = f.recipe.w.map(id => G.weapons.find(w => w.id === id)); if (ws.some(w => !w || !w.evo || w.lvl < FR.weaponLevel)) return false;
     if (f.recipe.p) { const p = G.passives.find(p => p.id === f.recipe.p); if (!p || p.lvl < FR.passiveLevel) return false; } return true; }); }
-function doFusion(f) { for (const id of f.recipe.w) G.weapons = G.weapons.filter(w => w.id !== id); if (f.recipe.p) G.passives = G.passives.filter(p => p.id !== f.recipe.p);
-  G.fusions.push({ id: f.id, t: 0, st: { list: [] } }); recalcPassives(); let msg = '¡FUSIÓN: ' + f.name.toUpperCase() + '!';
-  if (!META.book.fused[f.id]) { META.book.fused[f.id] = Date.now(); META.keys += D.fusionRules.firstTimeKeys; msg += ' +' + D.fusionRules.firstTimeKeys + ' llaves'; saveMeta(); }
+function doFusion(f) { track('fusion_made', { id: f.id, rare: !!f.rare, first: !META.book.fused[f.id], minute: Math.floor(G.t / 60) }); for (const id of f.recipe.w) G.weapons = G.weapons.filter(w => w.id !== id); if (f.recipe.p) G.passives = G.passives.filter(p => p.id !== f.recipe.p);
+  G.fusions.push({ id: f.id, t: 0, st: { list: [] } }); recalcPassives(); let msg = tr('¡FUSIÓN: ') + f.name.toUpperCase() + '!';
+  if (!META.book.fused[f.id]) { META.book.fused[f.id] = Date.now(); META.keys += D.fusionRules.firstTimeKeys; msg += ' +' + D.fusionRules.firstTimeKeys + tr(' llaves'); saveMeta(); }
   G.banner = { s: msg, t: 3.5 }; G.fusionFlash = 1.2; sfx('win'); G.fusionOpts = null; G.state = 'play'; }
 function openChest() { const el = fusionEligible(); if (el.length && G.state === 'play') { G.fusionOpts = el.slice(0, 3); G.state = 'fusion'; return; } openChestNormal(); }
 function openChestNormal() { const n = Math.random() < D.run.chest.tripleChance + (G.p.chestExtra || 0) ? 3 : 1, got = []; G.chestsOpened++;
-  for (let i = 0; i < n; i++) { const pool = upgradePool(); if (!pool.length) { G.keys += 3; got.push('+3 llaves'); continue; } const owned = pool.filter(o => o.kind === 'w' && o.lvl > 1); const list = owned.length && Math.random() < 0.6 ? owned : pool; const c = list[Math.floor(Math.random() * list.length)];
+  for (let i = 0; i < n; i++) { const pool = upgradePool(); if (!pool.length) { G.keys += 3; got.push(tr('+3 llaves')); continue; } const owned = pool.filter(o => o.kind === 'w' && o.lvl > 1); const list = owned.length && Math.random() < 0.6 ? owned : pool; const c = list[Math.floor(Math.random() * list.length)];
     applyChoice(c); got.push(upLabel(c)[0]); }
-  G.banner = { s: '🎁 Cofre' + (n === 3 ? ' x3' : '') + ': ' + got.join(', ').slice(0, 60), t: 3 }; sfx('win'); }
+  G.banner = { s: tr('🎁 Cofre') + (n === 3 ? ' x3' : '') + ': ' + got.join(', ').slice(0, 60), t: 3 }; sfx('win'); }
 
 // ---------------- achievements / end -------------
 function achMet(c) { const runK = G.committed ? 0 : G.kills, runKar = G.committed ? 0 : G.karens;
@@ -525,6 +545,7 @@ function checkAch() { for (const a of D.achievements) if (!META.ach[a.id] && ach
   if (a.reward.unlock && !had[a.reward.unlock]) G.unlockedNow.push(D.characters.find(c => c.id === a.reward.unlock).name); } }
 function endRun(win) {
   if (!G || G.state === 'over') return; G.state = 'over'; G.win = win;
+  track('run_end', { reason: win ? 'victory' : (G.abandoned ? 'abandon' : 'death'), minute: Math.floor(G.t / 60), seconds: Math.floor(G.t), level: G.lvl, fusions: G.fusions.length, kills: G.kills, character: G.char.id });
   const kg = Math.round(G.keys * G.p.keyMul); G.keysFinal = kg; META.keys += kg; META.stats.lifetimeKeys += kg; META.totalKills += G.kills; META.stats.karens += G.karens; META.bestTime = Math.max(META.bestTime, G.t);
   if (win) { META.wins++; META.stats.winsAs[G.char.id] = (META.stats.winsAs[G.char.id] || 0) + 1; } G.committed = true;
   checkAch(); saveMeta(); if (!win) sfx('lose');
@@ -541,6 +562,7 @@ function readInput(slot) {
 function update(dt) {
   if (screen !== 'play' || G.state !== 'play') return;
   G.t += dt;
+  for (const m of [5, 10, 15]) if (G.t >= m * 60 && !G.minSent[m]) { G.minSent[m] = 1; if (!DBG.t || DBG.t < m * 60) track('minute_reached', { minute: m, level: G.lvl, character: G.char.id }); }
   for (const P of G.players) {
     const { mx, my } = P.input = readInput(P.inputSlot); const ml = Math.hypot(mx, my);
     if (ml > 0.01) { P.fx = mx / ml; P.fy = my / ml; P.moving = true; } else P.moving = false;
@@ -653,8 +675,8 @@ function renderWorld() {
 }
 function renderHUD() {
   ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, 6); ctx.fillStyle = '#3fbf5a'; ctx.fillRect(0, 0, W * Math.min(1, G.xp / G.xpNext), 6);
-  txt('NV ' + G.lvl, 4, 16, 8); txt(fmt(G.t), W / 2, 20, 14, G.t >= TLd().highSeason ? '#ff8040' : '#fff', 'center');
-  const ph = phaseName(); if (ph) txt(ph, W / 2, 30, 7, ph === 'RESPIRO' ? '#7fe0ff' : '#ff8040', 'center');
+  txt(tr('NV ') + G.lvl, 4, 16, 8); txt(fmt(G.t), W / 2, 20, 14, G.t >= TLd().highSeason ? '#ff8040' : '#fff', 'center');
+  const ph = phaseName(); if (ph) txt(ph, W / 2, 30, 7, ph === tr('RESPIRO') ? '#7fe0ff' : '#ff8040', 'center');
   txt('☠ ' + G.kills, 4, 28, 8, '#ddd'); txt('🔑 ' + G.keys, 4, 40, 8, '#ffd23f');
   const sl = slotsOpen(), lockLv = D.run.slotOpenLevels, bs = 16;
   for (let row = 0; row < 2; row++) { const arr = row === 0 ? G.weapons : G.passives, y = H - 4 - (2 - row) * (bs + 2);
@@ -667,95 +689,98 @@ function renderHUD() {
   G.fusions.forEach((F, i) => { const f = D.fusions.find(x => x.id === F.id); drawIcon(f.icon, 4 + D.run.slotsMax * 18 + 6 + i * 20, H - 40, 18); });
   const bb = (G.boss && G.boss.alive) ? G.boss : (G.mini && G.mini.alive ? G.mini : null);
   if (bb) { const bw = Math.min(260, W - 40); ctx.fillStyle = '#300'; ctx.fillRect(W / 2 - bw / 2, 34, bw, 6); ctx.fillStyle = bb === G.boss ? '#d4af37' : '#ff2a2a'; ctx.fillRect(W / 2 - bw / 2, 34, bw * bb.hp / bb.maxHp, 6);
-    txt(bb.d.name.toUpperCase() + (bb === G.boss ? ' · FASE ' + (bb.phase || 1) : ''), W / 2, 50, 7, '#ffb080', 'center'); }
+    txt(bb.d.name.toUpperCase() + (bb === G.boss ? tr(' · FASE ') + (bb.phase || 1) : ''), W / 2, 50, 7, '#ffb080', 'center'); }
   if (G.banner) txt(G.banner.s, W / 2, H / 3, 12, '#ffd23f', 'center');
   btn(W - 26, 10, 20, 20, 'II', () => togglePause(), { size: 9 });
 }
 function renderToasts(dt) { let y = 60; for (const a of achToast) { a.t -= dt; ctx.fillStyle = 'rgba(20,10,30,.85)'; ctx.fillRect(W - 170, y, 164, 26); ctx.strokeStyle = '#ffd23f'; ctx.strokeRect(W - 169.5, y + .5, 163, 25);
   txt(a.s, W - 164, y + 11, 7, '#ffd23f'); txt(a.sub, W - 164, y + 21, 5, '#ddd'); y += 30; } achToast = achToast.filter(a => a.t > 0); }
 function overlay(a = 0.7) { ctx.fillStyle = `rgba(10,6,16,${a})`; ctx.fillRect(0, 0, W, H); }
-function upLabel(c) { if (c.kind === 'heal') return ['Botiquín', 'Cura toda la vida', 'food_buffet']; if (c.kind === 'keys') return ['Llavero', '+2 llaves', 'key'];
-  if (c.kind === 'w') { const S = D.weapons[c.id], LR = D.levelRules; if (c.lvl === LR.evoLevel && S.evo) return ['→ ' + S.evo.name, '¡EVOLUCIONA al nivel 5!', S.evo.spr];
+function upLabel(c) { if (c.kind === 'heal') return [tr('Botiquín'), tr('Cura toda la vida'), 'food_buffet']; if (c.kind === 'keys') return [tr('Llavero'), tr('+2 llaves'), 'key'];
+  if (c.kind === 'w') { const S = D.weapons[c.id], LR = D.levelRules; if (c.lvl === LR.evoLevel && S.evo) return ['→ ' + S.evo.name, tr('¡EVOLUCIONA al nivel 5!'), S.evo.spr];
     const owned = G.weapons.find(w => w.id === c.id), nm = owned && owned.evo ? S.evo.name : S.name, ic = owned && owned.evo ? S.evo.spr : (S.icon || c.id);
-    const lvTxt = { 2: 'Efecto A', 3: '+20% daño', 4: 'Efecto B', 6: '+25% daño', 7: '+1 proyectil / +20% área', 8: 'MAESTRÍA: -20% enfriamiento' }[c.lvl];
-    return [nm + (c.lvl > 1 ? ' Nv' + c.lvl : ' (NUEVA)'), c.lvl > 1 ? (lvTxt || 'Mejora') : S.desc, ic]; }
-  const S = D.passives[c.id]; return [S.name + (c.lvl > 1 ? ' Nv' + c.lvl : ' (NUEVO)'), S.desc, S.icon || ('ic_' + c.id)]; }
-function renderLevelUp() { overlay(); txt(G.banishMode ? 'ELEGÍ UNA OPCIÓN PARA DESCARTAR' : '¡SUBISTE DE NIVEL!', W / 2, 36, 12, G.banishMode ? '#ff6060' : '#ffd23f', 'center');
+    const lvTxt = { 2: tr('Efecto A'), 3: tr('+20% daño'), 4: tr('Efecto B'), 6: tr('+25% daño'), 7: tr('+1 proyectil / +20% área'), 8: tr('MAESTRÍA: -20% enfriamiento') }[c.lvl];
+    return [nm + (c.lvl > 1 ? tr(' Nv') + c.lvl : tr(' (NUEVA)')), c.lvl > 1 ? (lvTxt || tr('Mejora')) : S.desc, ic]; }
+  const S = D.passives[c.id]; return [S.name + (c.lvl > 1 ? tr(' Nv') + c.lvl : tr(' (NUEVO)')), S.desc, S.icon || ('ic_' + c.id)]; }
+function renderLevelUp() { overlay(); txt(G.banishMode ? tr('ELEGÍ UNA OPCIÓN PARA DESCARTAR') : tr('¡SUBISTE DE NIVEL!'), W / 2, 36, 12, G.banishMode ? '#ff6060' : '#ffd23f', 'center');
   const n = G.choices.length, cw = Math.min(140, (W - 24) / n - 6), ch = 92, y = H / 2 - 54;
   G.choices.forEach((c, i) => { const x = W / 2 + (i - (n - 1) / 2) * (cw + 6) - cw / 2; const [nm, d, ic] = upLabel(c);
     buttons.push({ x, y, w: cw, h: ch, fn: () => choose(i) });
     ctx.fillStyle = '#2a2140'; ctx.fillRect(x, y, cw, ch); ctx.strokeStyle = G.banishMode ? '#ff6060' : nm.startsWith('→') ? '#ff7bc2' : '#f2c230'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, cw - 1, ch - 1);
     drawIcon(ic, x + cw / 2 - 16, y + 6, 32); txt(nm.length > 24 ? nm.slice(0, 23) + '.' : nm, x + cw / 2, y + 50, 6, '#fff', 'center'); txt(d.length > 28 ? d.slice(0, 27) + '.' : d, x + cw / 2, y + 63, 5, '#bbb', 'center'); txt('[' + (i + 1) + ']', x + cw / 2, y + 84, 7, '#f2c230', 'center'); });
   const by = y + ch + 12;
-  btn(W / 2 - 110, by, 104, 18, 'Reroll (' + G.rerolls + ') [R]', reroll, { disabled: G.rerolls <= 0 }); if (SHEET.ui_btn_reroll) drawIcon('ui_btn_reroll', W / 2 - 128, by, 18);
-  btn(W / 2 + 6, by, 104, 18, 'Descartar (' + G.banishLeft + ') [X]', toggleBanish, { disabled: G.banishLeft <= 0, hl: G.banishMode }); if (SHEET.ui_btn_descarte) drawIcon('ui_btn_descarte', W / 2 + 112, by, 18);
-  txt('Slots: ' + G.weapons.length + '/' + slotsOpen() + ' armas · ' + G.passives.length + '/' + slotsOpen() + ' pasivos', W / 2, by + 32, 6, '#aaa', 'center'); }
-function renderFusion() { overlay(0.8); txt('COFRE VIOLETA: ¿FUSIONAR?', W / 2, 40, 13, '#c58cff', 'center');
+  btn(W / 2 - 110, by, 104, 18, tr('Reroll (') + G.rerolls + ') [R]', reroll, { disabled: G.rerolls <= 0 }); if (SHEET.ui_btn_reroll) drawIcon('ui_btn_reroll', W / 2 - 128, by, 18);
+  btn(W / 2 + 6, by, 104, 18, tr('Descartar (') + G.banishLeft + ') [X]', toggleBanish, { disabled: G.banishLeft <= 0, hl: G.banishMode }); if (SHEET.ui_btn_descarte) drawIcon('ui_btn_descarte', W / 2 + 112, by, 18);
+  txt(tr('Slots: ') + G.weapons.length + '/' + slotsOpen() + tr(' armas · ') + G.passives.length + '/' + slotsOpen() + tr(' pasivos'), W / 2, by + 32, 6, '#aaa', 'center'); }
+function renderFusion() { overlay(0.8); txt(tr('COFRE VIOLETA: ¿FUSIONAR?'), W / 2, 40, 13, '#c58cff', 'center');
   const n = G.fusionOpts.length, cw = Math.min(170, (W - 30) / n - 8), y = 60;
   G.fusionOpts.forEach((f, i) => { const x = W / 2 + (i - (n - 1) / 2) * (cw + 8) - cw / 2; ctx.fillStyle = '#2a1740'; ctx.fillRect(x, y, cw, 120); ctx.strokeStyle = f.rare ? '#ffd23f' : '#c58cff'; ctx.strokeRect(x + .5, y + .5, cw - 1, 119);
     drawIcon(f.icon, x + cw / 2 - 16, y + 6, 32); txt(f.name, x + cw / 2, y + 50, 7, '#fff', 'center'); const rec = f.recipe.w.map(id => D.weapons[id].evo.name).concat(f.recipe.p ? [D.passives[f.recipe.p].name] : []).join(' + ');
     txt(rec.slice(0, 34), x + cw / 2, y + 62, 5, '#c58cff', 'center'); txt(f.desc.slice(0, 34), x + cw / 2, y + 74, 5, '#ccc', 'center'); txt(f.desc.slice(34, 68), x + cw / 2, y + 82, 5, '#ccc', 'center');
-    btn(x + 8, y + 94, cw - 16, 18, 'FUSIONAR [' + (i + 1) + ']', () => doFusion(f), { hl: true, size: 7 }); });
-  txt('El arma y el pasivo desaparecen y se libera su slot. Fusiones: ' + G.fusions.length + '/' + D.fusionRules.maxPerRun, W / 2, y + 136, 6, '#aaa', 'center');
-  btn(W / 2 - 70, y + 146, 140, 20, 'NO, abrir cofre normal [N]', () => { G.fusionOpts = null; G.state = 'play'; openChestNormal(); }, { size: 6 }); }
+    btn(x + 8, y + 94, cw - 16, 18, tr('FUSIONAR [') + (i + 1) + ']', () => doFusion(f), { hl: true, size: 7 }); });
+  txt(tr('El arma y el pasivo desaparecen y se libera su slot. Fusiones: ') + G.fusions.length + '/' + D.fusionRules.maxPerRun, W / 2, y + 136, 6, '#aaa', 'center');
+  btn(W / 2 - 70, y + 146, 140, 20, tr('NO, abrir cofre normal [N]'), () => { G.fusionOpts = null; G.state = 'play'; openChestNormal(); }, { size: 6 }); }
 function bookState(f) { const B = META.book, wHalf = f.recipe.w.every(id => B.revealed[id + ':w']), pHalf = f.recipe.p ? !!B.revealed[f.recipe.p + ':p'] : wHalf; return { fused: !!B.fused[f.id], wHalf, pHalf, any: f.recipe.w.some(id => B.revealed[id + ':w']) || (f.recipe.p && B.revealed[f.recipe.p + ':p']) }; }
-function renderBook() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt('LIBRO DE RECETAS ' + Object.keys(META.book.fused).length + '/' + D.fusions.length, W / 2, 18, 12, '#c58cff', 'center');
+function renderBook() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt(tr('LIBRO DE RECETAS ') + Object.keys(META.book.fused).length + '/' + D.fusions.length, W / 2, 18, 12, '#c58cff', 'center');
   const per = 10, cw = 40, chh = 56, sx = W / 2 - per * (cw + 4) / 2;
   D.fusions.forEach((f, i) => { const col = i % per, row = Math.floor(i / per), x = sx + col * (cw + 4), y = 28 + row * (chh + 52), s = bookState(f);
     const card = s.fused ? (f.card || 'ui_receta_revelada') : (s.wHalf && s.pHalf ? (f.card || 'ui_receta_revelada') : 'ui_receta_silueta');
     if (SHEET[card]) drawIcon(card, x + 4, y, 48); if ((s.fused || (s.wHalf && s.pHalf)) && !f.card) drawIcon(f.icon, x + 12, y + 2, 32);
     if (s.fused && SHEET.ui_receta_brillo) { ctx.globalAlpha = 0.5; const sh = SHEET.ui_receta_brillo; ctx.drawImage(sh.img, (Math.floor(G_now() * 3) % sh.n) * sh.fw, 0, sh.fw, sh.fs, x + 12, y, 32, 48); ctx.globalAlpha = 1; }
     const nm = s.fused || (s.wHalf && s.pHalf) ? f.name : '???'; txt(nm.slice(0, 11), x + cw / 2 + 4, y + 56, 4, s.fused ? '#ffd23f' : '#ccc', 'center');
-    let r1 = f.rare ? (s.wHalf ? f.recipe.w.map(id => D.weapons[id].evo.name.split(' ')[0]).join('+') : 'Requiere dos') : (s.wHalf ? D.weapons[f.recipe.w[0]].evo.name.split(' ')[0] : '???'), r2 = f.rare ? (s.wHalf ? '' : 'armas maestras') : (s.pHalf ? '+' + D.passives[f.recipe.p].name.split(' ')[0] : '+ ???');
+    let r1 = f.rare ? (s.wHalf ? f.recipe.w.map(id => D.weapons[id].evo.name.split(' ')[0]).join('+') : tr('Requiere dos')) : (s.wHalf ? D.weapons[f.recipe.w[0]].evo.name.split(' ')[0] : '???'), r2 = f.rare ? (s.wHalf ? '' : tr('armas maestras')) : (s.pHalf ? '+' + D.passives[f.recipe.p].name.split(' ')[0] : '+ ???');
     txt(r1.slice(0, 12), x + cw / 2 + 4, y + 63, 4, f.rare ? '#ffd23f' : '#c58cff', 'center'); txt(r2.slice(0, 12), x + cw / 2 + 4, y + 69, 4, '#c58cff', 'center'); });
-  btn(W / 2 - 50, H - 24, 100, 18, 'Volver [Esc]', () => { screen = 'menu'; }); }
+  btn(W / 2 - 50, H - 24, 100, 18, tr('Volver [Esc]'), () => { screen = 'menu'; }); }
 const G_now = () => performance.now() / 1000;
-function renderPause() { overlay(); txt('PAUSA', W / 2, H / 2 - 30, 16, '#fff', 'center'); btn(W / 2 - 50, H / 2 - 10, 100, 20, 'Seguir [Esc]', togglePause);
-  btn(W / 2 - 50, H / 2 + 16, 100, 20, 'Abandonar', () => { G.state = 'play'; endRun(false); }); btn(W / 2 - 50, H / 2 + 42, 100, 20, 'Sonido: ' + (AU.on ? 'ON' : 'OFF'), () => { AU.on = !AU.on; if (AU.mus) AU.mus.gain.value = AU.on ? 0.18 : 0; }); }
-function renderSummary() { overlay(0.8); txt(G.win ? '¡EL HOTEL ES TUYO!' : 'TE DIERON DE BAJA', W / 2, 46, 16, G.win ? '#3fdc5a' : '#ff6060', 'center');
-  txt('Tiempo: ' + fmt(G.t), W / 2, 72, 10, '#fff', 'center'); txt('Kills: ' + G.kills, W / 2, 88, 10, '#fff', 'center'); txt('Llaves ganadas: ' + G.keysFinal + '  (total ' + META.keys + ')', W / 2, 104, 10, '#ffd23f', 'center');
-  txt('Nivel ' + G.lvl + ' · ' + G.char.name + (G.evolved.length ? ' · evoluciones: ' + G.evolved.length : ''), W / 2, 120, 8, '#bbb', 'center');
-  if (G.achNow.length) txt('Logros: ' + G.achNow.join(', ').slice(0, 90), W / 2, 136, 7, '#ffd23f', 'center');
-  if (G.unlockedNow.length) txt('Desbloqueado: ' + G.unlockedNow.join(', '), W / 2, 150, 9, '#ff7bc2', 'center');
-  btn(W / 2 - 110, 166, 105, 22, 'Otra run [Enter]', () => newRun(G.char.id), { hl: true }); btn(W / 2 + 5, 166, 105, 22, 'Menú [M]', () => { screen = 'menu'; G = null; }); }
+function renderPause() { overlay(); txt(tr('PAUSA'), W / 2, H / 2 - 30, 16, '#fff', 'center'); btn(W / 2 - 50, H / 2 - 10, 100, 20, tr('Seguir [Esc]'), togglePause);
+  btn(W / 2 - 50, H / 2 + 16, 100, 20, tr('Abandonar'), () => { G.state = 'play'; G.abandoned = true; endRun(false); }); btn(W / 2 - 50, H / 2 + 42, 100, 20, tr('Sonido: ') + (AU.on ? tr('ON') : tr('OFF')), () => { AU.on = !AU.on; if (AU.mus) AU.mus.gain.value = AU.on ? 0.18 : 0; }); }
+function renderSummary() { overlay(0.8); txt(G.win ? tr('¡EL HOTEL ES TUYO!') : tr('TE DIERON DE BAJA'), W / 2, 46, 16, G.win ? '#3fdc5a' : '#ff6060', 'center');
+  txt(tr('Tiempo: ') + fmt(G.t), W / 2, 72, 10, '#fff', 'center'); txt(tr('Kills: ') + G.kills, W / 2, 88, 10, '#fff', 'center'); txt(tr('Llaves ganadas: ') + G.keysFinal + tr('  (total ') + META.keys + ')', W / 2, 104, 10, '#ffd23f', 'center');
+  txt(tr('Nivel ') + G.lvl + ' · ' + G.char.name + (G.evolved.length ? tr(' · evoluciones: ') + G.evolved.length : ''), W / 2, 120, 8, '#bbb', 'center');
+  if (G.achNow.length) txt(tr('Logros: ') + G.achNow.join(', ').slice(0, 90), W / 2, 136, 7, '#ffd23f', 'center');
+  if (G.unlockedNow.length) txt(tr('Desbloqueado: ') + G.unlockedNow.join(', '), W / 2, 150, 9, '#ff7bc2', 'center');
+  btn(W / 2 - 110, 166, 105, 22, tr('Otra run [Enter]'), () => newRun(G.char.id), { hl: true }); btn(W / 2 + 5, 166, 105, 22, tr('Menú [M]'), () => { screen = 'menu'; G = null; }); }
 function shopPrice(s) { const lv = META.shop[s.id]; return lv < s.price.length ? s.price[lv] : null; }
 function costumesOf(cid) { return Object.keys(D.costumes).filter(k => D.costumes[k].char === cid && META.costumes[k]); }
 function cycleCostume() { const c = META.sel, own = [null, ...costumesOf(c)]; const i = own.indexOf(META.costumeSel[c] || null); META.costumeSel[c] = own[(i + 1) % own.length]; if (!META.costumeSel[c]) delete META.costumeSel[c]; saveMeta(); }
 function renderMenu() {
   ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H);
   for (let y = 0; y < H; y += 64) for (let x = 0; x < W; x += 64) { ctx.globalAlpha = 0.25; ctx.drawImage(SPR.tile, x, y); ctx.globalAlpha = 1; }
-  txt('CHECK-OUT CHAOS', W / 2, 24, 16, '#f2c230', 'center'); txt('v2 · Sobreviví 15 minutos de Temporada Alta', W / 2, 36, 6, '#ccc', 'center');
-  txt('🔑 ' + META.keys + '   ☠ ' + META.totalKills + '   mejor ' + fmt(META.bestTime) + '   🏆 ' + Object.keys(META.ach).length + '/' + D.achievements.length, W / 2, 48, 7, '#ffd23f', 'center');
+  btn(W - 58, 4, 54, 14, LANG === 'es' ? 'ES | en' : 'es | EN', () => setLang(LANG === 'es' ? 'en' : 'es'), { size: 6 });
+  const wl = WISHLIST_URL(); if (wl) btn(4, 4, 84, 14, tr('Wishlist en Steam'), () => { track('wishlist_click', { from: 'menu' }); PLATFORM.openLink(wl); }, { size: 5 });
+  txt('CHECK-OUT CHAOS', W / 2, 24, 16, '#f2c230', 'center'); txt(tr('v2 · Sobreviví 15 minutos de Temporada Alta'), W / 2, 36, 6, '#ccc', 'center');
+  txt('🔑 ' + META.keys + '   ☠ ' + META.totalKills + tr('   mejor ') + fmt(META.bestTime) + '   🏆 ' + Object.keys(META.ach).length + '/' + D.achievements.length, W / 2, 48, 7, '#ffd23f', 'center');
   const cs = D.characters, perRow = Math.ceil(cs.length / 2), cw = Math.min(64, (W - 16) / perRow - 4), chh = 66, y0 = 54;
   cs.forEach((c, i) => { const row = Math.floor(i / perRow), col = i % perRow, n = Math.min(perRow, cs.length - row * perRow);
     const x = W / 2 + (col - (n - 1) / 2) * (cw + 4) - cw / 2, y = y0 + row * (chh + 4), un = META.unlocked[c.id], sel = META.sel === c.id;
-    buttons.push({ x, y, w: cw, h: chh, fn: () => { if (un) META.sel = c.id; else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.sel = c.id; sfx('key'); } saveMeta(); } });
+    buttons.push({ x, y, w: cw, h: chh, fn: () => { if (un) META.sel = c.id; else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.sel = c.id; sfx('key'); track('character_unlocked', { id: c.id, via: 'keys', price: c.price }); } saveMeta(); } });
     ctx.fillStyle = sel ? '#3a2f5a' : '#241c33'; ctx.fillRect(x, y, cw, chh); ctx.strokeStyle = sel ? '#f2c230' : '#554'; ctx.strokeRect(x + .5, y + .5, cw - 1, chh - 1);
     ctx.globalAlpha = un ? 1 : 0.3; drawAnim(playerKey(c.id, META.costumeSel[c.id]), x + cw / 2, y + 44, animFrame(sel, performance.now() / 1000), false, 1.25); ctx.globalAlpha = 1;
     txt(c.name.length > 12 ? c.name.slice(0, 11) + '.' : c.name, x + cw / 2, y + 54, 5, '#fff', 'center');
     if (!un) txt('🔒 ' + c.price + '🔑', x + cw / 2, y + 63, 5, META.keys >= c.price ? '#3fdc5a' : '#ff7bc2', 'center'); else txt(D.weapons[c.weapon].name.slice(0, 14), x + cw / 2, y + 63, 4, '#f2c230', 'center'); });
   const sc = D.characters.find(c => c.id === META.sel) || cs[0]; let y = y0 + 2 * (chh + 4) + 4;
   txt(sc.name + ' — ' + D.weapons[sc.weapon].name + ' (' + D.weapons[sc.weapon].desc + ') · ' + sc.bonusText, W / 2, y + 6, 6, '#fff', 'center');
-  if (!META.unlocked[sc.id] && sc.unlock) txt('Desbloqueo: ' + sc.unlock.text + ' o ' + sc.price + ' llaves', W / 2, y + 15, 6, '#ff7bc2', 'center');
+  if (!META.unlocked[sc.id] && sc.unlock) txt(tr('Desbloqueo: ') + sc.unlock.text + tr(' o ') + sc.price + tr(' llaves'), W / 2, y + 15, 6, '#ff7bc2', 'center');
   y += 20; let sx = W / 2 - 3 * 66 / 2;
   for (const s of D.shop) { const pr = shopPrice(s); btn(sx, y, 62, 16, pr == null ? s.name + ' MAX' : s.name + ' ' + pr + '🔑', () => { if (pr != null && META.keys >= pr) { META.keys -= pr; META.shop[s.id]++; saveMeta(); sfx('key'); } }, { size: 5, disabled: pr == null || META.keys < pr }); sx += 66; }
   y += 20; const own = costumesOf(META.sel), cur = META.costumeSel[META.sel];
-  btn(W / 2 - 128, y, 124, 16, 'Traje: ' + (cur ? D.costumes[cur].name : 'Clásico') + (own.length ? ' [T]' : ' (sin trajes)'), cycleCostume, { size: 5, disabled: !own.length });
-  btn(W / 2 + 4, y, 124, 16, 'Logros ' + Object.keys(META.ach).length + '/' + D.achievements.length + ' [L]', () => { screen = 'ach'; }, { size: 6 });
-  btn(W / 2 - 60, y + 22, 120, 22, 'JUGAR [Enter]', startSelected, { hl: true, size: 10 }); btn(W / 2 + 66, y + 22, 62, 22, 'Recetas [B]', () => { screen = 'book'; }, { size: 6 });
-  const tips = D.loadingTips; txt('Tip: ' + tips[Math.floor(G_now() / 6) % tips.length], W / 2, Math.min(H - 12, y + 50), 5, '#c58cff', 'center');
-  txt('WASD/Flechas o arrastrá · Esc/P pausa · 1-9 elegir', W / 2, Math.min(H - 4, y + 56), 5, '#999', 'center');
+  btn(W / 2 - 128, y, 124, 16, tr('Traje: ') + (cur ? D.costumes[cur].name : tr('Clásico')) + (own.length ? ' [T]' : tr(' (sin trajes)')), cycleCostume, { size: 5, disabled: !own.length });
+  btn(W / 2 + 4, y, 124, 16, tr('Logros ') + Object.keys(META.ach).length + '/' + D.achievements.length + ' [L]', () => { screen = 'ach'; }, { size: 6 });
+  btn(W / 2 - 60, y + 22, 120, 22, tr('JUGAR [Enter]'), startSelected, { hl: true, size: 10 }); btn(W / 2 + 66, y + 22, 62, 22, tr('Recetas [B]'), () => { screen = 'book'; }, { size: 6 });
+  const tips = D.loadingTips; txt(tr('Tip: ') + tips[Math.floor(G_now() / 6) % tips.length], W / 2, Math.min(H - 12, y + 50), 5, '#c58cff', 'center');
+  txt(tr('WASD/Flechas o arrastrá · Esc/P pausa · 1-9 elegir'), W / 2, Math.min(H - 4, y + 56), 5, '#999', 'center');
 }
-function renderAch() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt('LOGROS', W / 2, 22, 14, '#f2c230', 'center');
+function renderAch() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt(tr('LOGROS'), W / 2, 22, 14, '#f2c230', 'center');
   const colW = Math.min(300, (W - 20) / 2); D.achievements.forEach((a, i) => { const col = i % 2, row = Math.floor(i / 2), x = W / 2 + (col ? 4 : -colW - 4), y = 32 + row * 34, got = !!META.ach[a.id];
-    ctx.fillStyle = got ? '#2f3a26' : '#241c33'; ctx.fillRect(x, y, colW, 30); txt((got ? '✔ ' : '· ') + a.name, x + 5, y + 10, 7, got ? '#3fdc5a' : '#aaa'); txt(a.desc, x + 5, y + 19, 5, '#ccc'); txt('Premio: ' + rewardText(a.reward), x + 5, y + 27, 5, '#ffd23f'); });
-  btn(W / 2 - 50, H - 24, 100, 18, 'Volver [Esc]', () => { screen = 'menu'; }); }
+    ctx.fillStyle = got ? '#2f3a26' : '#241c33'; ctx.fillRect(x, y, colW, 30); txt((got ? '✔ ' : '· ') + a.name, x + 5, y + 10, 7, got ? '#3fdc5a' : '#aaa'); txt(a.desc, x + 5, y + 19, 5, '#ccc'); txt(tr('Premio: ') + rewardText(a.reward), x + 5, y + 27, 5, '#ffd23f'); });
+  btn(W / 2 - 50, H - 24, 100, 18, tr('Volver [Esc]'), () => { screen = 'menu'; }); }
+function WISHLIST_URL() { const u = Q.get('wishlist') || (D.links && D.links.wishlist) || ''; if (!u) return ''; if (PLATFORM.name === 'poki' && !(window.PokiSDK && window.PokiSDK.openExternalLink)) return ''; return u; }
 function startSelected() { if (!META.unlocked[META.sel]) META.sel = 'recep'; newRun(META.sel); }
 function togglePause() { if (!G) return; if (G.state === 'play') G.state = 'pause'; else if (G.state === 'pause') G.state = 'play'; }
 function onKey(c) {
   if (screen === 'book') { if (c === 'Escape' || c === 'KeyB' || c === 'Enter') screen = 'menu'; return; }
   if (screen === 'ach') { if (c === 'Escape' || c === 'KeyL' || c === 'Enter') screen = 'menu'; return; }
-  if (screen === 'menu') { if (c === 'Enter' || c === 'Space') startSelected(); if (c === 'KeyL') screen = 'ach'; if (c === 'KeyB') screen = 'book'; if (c === 'KeyT') cycleCostume();
+  if (screen === 'menu') { if (c === 'Enter' || c === 'Space') startSelected(); if (c === 'KeyI') setLang(LANG === 'es' ? 'en' : 'es'); if (c === 'KeyL') screen = 'ach'; if (c === 'KeyB') screen = 'book'; if (c === 'KeyT') cycleCostume();
     const i = +c.replace('Digit', '') - 1; const ch = D && D.characters[i]; if (ch && META.unlocked[ch.id]) { META.sel = ch.id; saveMeta(); } return; }
   if (!G) return;
   if (c === 'Escape' || c === 'KeyP') togglePause();
@@ -773,14 +798,20 @@ function frame(ts) {
   if (screen === 'menu') renderMenu(); else if (screen === 'ach') renderAch(); else if (screen === 'book') renderBook();
   else { renderWorld(); renderHUD(); if (G.state === 'levelup') renderLevelUp(); else if (G.state === 'pause') renderPause(); else if (G.state === 'fusion') renderFusion(); else if (G.state === 'over') renderSummary(); }
   renderToasts(raw);
+  const active = screen === 'play' && G && G.state === 'play' && !G.victory; if (active !== PLATFORM.playing) { if (active) PLATFORM.gameplayStart(); else PLATFORM.gameplayStop(); }
+  if (AU.mus) { const gv = audible() ? 0.18 : 0; if (AU.mus.gain.value !== gv) AU.mus.gain.value = gv; }
   if (DBG.speed !== 1 || DBG.t || DBG.god || DBG.dmg !== 1) txt('DEBUG x' + DBG.speed + (DBG.god ? ' god' : '') + (DBG.dmg !== 1 ? ' dmg' + DBG.dmg : ''), W - 4, H - 4, 6, '#f55', 'right');
   requestAnimationFrame(frame);
 }
 
 (async function boot() {
-  resize(); D = await loadData(); buildSprites(); buildExtraSprites(); loadMeta(); await loadSheets();
+  resize(); await PLATFORM.init(); PLATFORM.loadingStart(); D = await loadData(); applyLang(); buildSprites(); buildExtraSprites(); loadMeta(); await loadSheets();
   ENE = new Pool(D.timeline.maxEnemies + 60, () => ({})); PROJ = new Pool(500, () => ({})); PICK = new Pool(700, () => ({})); FX = new Pool(500, () => ({}));
   window.CC = { get G() { return G; }, get screen() { return screen; }, get META() { return META; }, enemies: () => ENE.count(), fusionEligible: () => fusionEligible(), doFusion: id => doFusion(D.fusions.find(f => f.id === id)), openChest: () => openChest(), slotsOpen: () => slotsOpen(), WS: id => WS(G.weapons.find(w => w.id === id)), sheets: () => Object.keys(SHEET), foodCount, choose, newRun, addWeapon: id => addWeapon(id), addPassive: id => addPassive(id), recalc: () => recalcPassives(), DBG };
+  window.CC.setLang = setLang; window.CC.lang = () => LANG; window.CC.tr = tr; window.CC.D = () => D;
+  PLATFORM.loadingFinished();
+  track('session_start', { device: ANALYTICS_DEV(), origin: (window.ANALYTICS && window.ANALYTICS.origin()) || null, returning: !!(window.ANALYTICS && window.ANALYTICS.returning), persistent: STORE.persistent, viewport: innerWidth + 'x' + innerHeight });
   requestAnimationFrame(frame);
 })();
+function ANALYTICS_DEV() { return window.ANALYTICS ? window.ANALYTICS.device() : 'unknown'; }
 })();
