@@ -158,7 +158,7 @@ function note(f, t, d, type, v) { const o = AU.ctx.createOscillator(), g = AU.ct
 // ---------------- meta (STORE wrapper, v2 with v1 migration; v1 key is never deleted) -------------
 const META_KEY_V1 = 'checkoutChaos.meta.v1', META_KEY = 'checkoutChaos.meta.v2';
 let META;
-function metaDefaults() { return { v: 3, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true, botones: true }, legacy: {}, earned: {}, shop: { hp: 0, dmg: 0, reroll: 0, banish: 0 }, sel: 'recep', book: { revealed: {}, fused: {} },
+function metaDefaults() { return { v: 3, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true, botones: true }, legacy: {}, earned: {}, earnedUnlocks: {}, shop: { hp: 0, dmg: 0, reroll: 0, banish: 0 }, sel: 'recep', book: { revealed: {}, fused: {} },
   ach: {}, costumes: {}, costumeSel: {}, stats: { karens: 0, winsAs: {}, lifetimeKeys: 0 }, migratedFromV1: false }; }
 // ---------------- edition (demo vs full) -------------
 function FULL() { return window.BUILD_FULL_VERSION === true || !!(D.edition && D.edition.FULL_VERSION); }
@@ -179,16 +179,19 @@ function loadMeta() {
     if (r.bestTime >= 60) grantAch('primer_turno', true); if (r.bestTime >= 300 || r.botones) grantAch('media_jornada', true);
     if (r.v1wins > 0) grantAch('inspeccion', true); if (META.totalKills >= 500) grantAch('matanza', true); }
   META.legacy = META.legacy || {}; META.earned = META.earned || {};
+  // earnedUnlocks = characters unlocked through play (achievements or keys). Seeded once from saves that predate it; never filled by BUILD_ALL_UNLOCKED.
+  if (!META.earnedUnlocks) { META.earnedUnlocks = {}; for (const c of D.characters) if (c.unlock && META.unlocked[c.id]) META.earnedUnlocks[c.id] = 1; }
   // demo split migration (once): anything already owned stays playable forever, even in the demo. Fresh saves get nothing extra.
   if (!META.demoSplit) { META.demoSplit = 1; if (existed) for (const id in META.unlocked) if (META.unlocked[id] && !inDemoSet(id)) META.legacy[id] = 1; }
   for (const c of D.characters) if (!c.unlock && canUnlock(c.id)) META.unlocked[c.id] = true;
-  if (FULL()) for (const id in META.earned) META.unlocked[id] = true; // achievement unlocks earned in the demo apply in the full version
+  if (FULL()) for (const id in META.earned) META.unlocked[id] = true;
+  if (FULL() && window.BUILD_ALL_UNLOCKED === true) for (const c of D.characters) META.unlocked[c.id] = true; // desktop full build: all 14 from the start // achievement unlocks earned in the demo apply in the full version
   saveMeta(); }
 function saveMeta() { STORE.setJSON(META_KEY, META); }
 let achToast = [];
 function grantAch(id, silent) {
   if (META.ach[id]) return; const a = D.achievements.find(a => a.id === id); if (!a) return; META.ach[id] = Date.now(); const r = a.reward; track('achievement_unlocked', { id, silent: !!silent }); if (r.unlock && !META.unlocked[r.unlock] && canUnlock(r.unlock)) track('character_unlocked', { id: r.unlock, via: 'achievement' });
-  if (r.keys) { META.keys += r.keys; META.stats.lifetimeKeys += r.keys; } if (r.unlock) { if (canUnlock(r.unlock)) META.unlocked[r.unlock] = true; else META.earned[r.unlock] = 1; } if (r.costume) META.costumes[r.costume] = true;
+  if (r.keys) { META.keys += r.keys; META.stats.lifetimeKeys += r.keys; } if (r.unlock) { META.earnedUnlocks[r.unlock] = 1; if (canUnlock(r.unlock)) META.unlocked[r.unlock] = true; else META.earned[r.unlock] = 1; } if (r.costume) META.costumes[r.costume] = true;
   saveMeta(); if (!silent) { achToast.push({ s: '🏆 ' + a.name, sub: rewardText(r), t: 3.5 }); sfx('lvl'); } }
 function rewardText(r) { const o = []; if (r.keys) o.push('+' + r.keys + tr(' llaves')); if (r.unlock) o.push(tr('desbloquea ') + D.characters.find(c => c.id === r.unlock).name + (canUnlock(r.unlock) ? '' : tr(' (versión completa)'))); if (r.costume) o.push(tr('traje ') + D.costumes[r.costume].name); return o.join(' · '); }
 
@@ -551,7 +554,7 @@ function achMet(c) { const runK = G.committed ? 0 : G.kills, runKar = G.committe
   if (c.evolveCount) return G.evolved.length >= c.evolveCount; if (c.winMinHp) return !!G.win && G.minHpFrac >= c.winMinHp; if (c.winNoFood) return !!G.win && !Object.keys(G.ate).length;
   if (c.duenoUnder) return G.duenoKillTime != null && G.duenoKillTime < c.duenoUnder; if (c.winKills) return !!G.win && G.kills >= c.winKills;
   if (c.fusionsTotal) return Object.keys(META.book.fused).length >= c.fusionsTotal; if (c.fusionsNormal) return D.fusions.filter(f => !f.rare && META.book.fused[f.id]).length >= c.fusionsNormal;
-  if (c.allUnlocked) return D.characters.filter(ch => ch.unlock).every(ch => META.unlocked[ch.id]); return false; }
+  if (c.allUnlocked) return D.characters.filter(ch => ch.unlock).every(ch => META.unlocked[ch.id] && META.earnedUnlocks[ch.id]); return false; }
 function checkAch() { for (const a of D.achievements) if (!META.ach[a.id] && achMet(a.cond)) { const had = { ...META.unlocked }; grantAch(a.id); G.achNow.push(a.name);
   if (a.reward.unlock && !had[a.reward.unlock] && META.unlocked[a.reward.unlock]) G.unlockedNow.push(D.characters.find(c => c.id === a.reward.unlock).name); } }
 function endRun(win) {
@@ -770,7 +773,7 @@ function renderMenu() {
   const cs = D.characters, perRow = Math.ceil(cs.length / 2), cw = Math.min(64, (W - 16) / perRow - 4), chh = 56, y0 = 86;
   cs.forEach((c, i) => { const row = Math.floor(i / perRow), col = i % perRow, n = Math.min(perRow, cs.length - row * perRow);
     const x = W / 2 + (col - (n - 1) / 2) * (cw + 4) - cw / 2, y = y0 + row * (chh + 4), un = playable(c.id), lockedFull = !un && !canUnlock(c.id), sel = MENU_PEEK ? MENU_PEEK === c.id : META.sel === c.id;
-    buttons.push({ x, y, w: cw, h: chh, fn: () => { MENU_PEEK = un ? null : c.id; if (un) META.sel = c.id; else if (lockedFull) { sfx('hurt'); } else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.sel = c.id; sfx('key'); track('character_unlocked', { id: c.id, via: 'keys', price: c.price }); } saveMeta(); } });
+    buttons.push({ x, y, w: cw, h: chh, fn: () => { MENU_PEEK = un ? null : c.id; if (un) META.sel = c.id; else if (lockedFull) { sfx('hurt'); } else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.earnedUnlocks[c.id] = 1; META.sel = c.id; sfx('key'); track('character_unlocked', { id: c.id, via: 'keys', price: c.price }); } saveMeta(); } });
     ctx.fillStyle = sel ? '#3a2f5a' : '#241c33'; ctx.fillRect(x, y, cw, chh); ctx.strokeStyle = sel ? '#f2c230' : '#554'; ctx.strokeRect(x + .5, y + .5, cw - 1, chh - 1);
     ctx.globalAlpha = un ? 1 : 0.3; drawAnim(playerKey(c.id, META.costumeSel[c.id]), x + cw / 2, y + 38, animFrame(sel, performance.now() / 1000), false, 1.1); ctx.globalAlpha = 1;
     txt(c.name.length > 12 ? c.name.slice(0, 11) + '.' : c.name, x + cw / 2, y + 46, 5, '#fff', 'center');
