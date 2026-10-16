@@ -2578,6 +2578,16 @@
  ],
  "links": {
   "wishlist": "",
-  "_comment": "Set wishlist to the Steam store URL once the Coming Soon page exists; the menu button only shows when non-empty (and on Poki only via PokiSDK.openExternalLink)."
+  "_comment": "wishlist: Steam store URL; fullVersion: where to get the full game. Buttons only open a link when the URL is non-empty (on Poki only via PokiSDK.openExternalLink).",
+  "fullVersion": ""
+ },
+ "edition": {
+  "FULL_VERSION": false,
+  "demoCharacters": [
+   "recep",
+   "house",
+   "botones"
+  ],
+  "_comment": "Demo build: only demoCharacters are playable; the rest show 'Available in the full version'. FULL_VERSION=true (or window.BUILD_FULL_VERSION=true, see build_dist.py --full) restores key purchases and achievement unlocks. Saves that already owned a character keep it (META.legacy)."
  }
 }

@@ -158,10 +158,17 @@ function note(f, t, d, type, v) { const o = AU.ctx.createOscillator(), g = AU.ct
 // ---------------- meta (STORE wrapper, v2 with v1 migration; v1 key is never deleted) -------------
 const META_KEY_V1 = 'checkoutChaos.meta.v1', META_KEY = 'checkoutChaos.meta.v2';
 let META;
-function metaDefaults() { return { v: 3, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true, botones: true, cocinero: true }, shop: { hp: 0, dmg: 0, reroll: 0, banish: 0 }, sel: 'recep', book: { revealed: {}, fused: {} },
+function metaDefaults() { return { v: 3, keys: 0, totalKills: 0, bestTime: 0, runs: 0, wins: 0, unlocked: { recep: true, house: true, botones: true }, legacy: {}, earned: {}, shop: { hp: 0, dmg: 0, reroll: 0, banish: 0 }, sel: 'recep', book: { revealed: {}, fused: {} },
   ach: {}, costumes: {}, costumeSel: {}, stats: { karens: 0, winsAs: {}, lifetimeKeys: 0 }, migratedFromV1: false }; }
+// ---------------- edition (demo vs full) -------------
+function FULL() { return window.BUILD_FULL_VERSION === true || !!(D.edition && D.edition.FULL_VERSION); }
+function DEMO_CHARS() { return (D.edition && D.edition.demoCharacters) || ['recep', 'house', 'botones']; }
+function inDemoSet(id) { return DEMO_CHARS().includes(id); }
+// owned AND allowed in this edition. Legacy = owned before the demo split (save migration) -> always playable.
+function playable(id) { return !!META.unlocked[id] && (FULL() || inDemoSet(id) || !!META.legacy[id]); }
+function canUnlock(id) { return FULL() || inDemoSet(id); }
 function loadMeta() {
-  let m = STORE.getJSON(META_KEY);
+  let m = STORE.getJSON(META_KEY); const existed = !!m || !!STORE.get(META_KEY_V1);
   if (!m) { let old = STORE.getJSON(META_KEY_V1);
     m = metaDefaults();
     if (old) { Object.assign(m, { keys: old.keys || 0, totalKills: old.totalKills || 0, bestTime: old.bestTime || 0, runs: old.runs || 0, wins: 0, sel: old.sel || 'recep' });
@@ -171,15 +178,19 @@ function loadMeta() {
   if (META.pendingRetro) { const r = META.pendingRetro; delete META.pendingRetro;   // v1 win = beat La Inspección (old final boss)
     if (r.bestTime >= 60) grantAch('primer_turno', true); if (r.bestTime >= 300 || r.botones) grantAch('media_jornada', true);
     if (r.v1wins > 0) grantAch('inspeccion', true); if (META.totalKills >= 500) grantAch('matanza', true); }
-  for (const c of D.characters) if (!c.unlock) META.unlocked[c.id] = true;
+  META.legacy = META.legacy || {}; META.earned = META.earned || {};
+  // demo split migration (once): anything already owned stays playable forever, even in the demo. Fresh saves get nothing extra.
+  if (!META.demoSplit) { META.demoSplit = 1; if (existed) for (const id in META.unlocked) if (META.unlocked[id] && !inDemoSet(id)) META.legacy[id] = 1; }
+  for (const c of D.characters) if (!c.unlock && canUnlock(c.id)) META.unlocked[c.id] = true;
+  if (FULL()) for (const id in META.earned) META.unlocked[id] = true; // achievement unlocks earned in the demo apply in the full version
   saveMeta(); }
 function saveMeta() { STORE.setJSON(META_KEY, META); }
 let achToast = [];
 function grantAch(id, silent) {
-  if (META.ach[id]) return; const a = D.achievements.find(a => a.id === id); if (!a) return; META.ach[id] = Date.now(); const r = a.reward; track('achievement_unlocked', { id, silent: !!silent }); if (r.unlock && !META.unlocked[r.unlock]) track('character_unlocked', { id: r.unlock, via: 'achievement' });
-  if (r.keys) { META.keys += r.keys; META.stats.lifetimeKeys += r.keys; } if (r.unlock) META.unlocked[r.unlock] = true; if (r.costume) META.costumes[r.costume] = true;
+  if (META.ach[id]) return; const a = D.achievements.find(a => a.id === id); if (!a) return; META.ach[id] = Date.now(); const r = a.reward; track('achievement_unlocked', { id, silent: !!silent }); if (r.unlock && !META.unlocked[r.unlock] && canUnlock(r.unlock)) track('character_unlocked', { id: r.unlock, via: 'achievement' });
+  if (r.keys) { META.keys += r.keys; META.stats.lifetimeKeys += r.keys; } if (r.unlock) { if (canUnlock(r.unlock)) META.unlocked[r.unlock] = true; else META.earned[r.unlock] = 1; } if (r.costume) META.costumes[r.costume] = true;
   saveMeta(); if (!silent) { achToast.push({ s: '🏆 ' + a.name, sub: rewardText(r), t: 3.5 }); sfx('lvl'); } }
-function rewardText(r) { const o = []; if (r.keys) o.push('+' + r.keys + tr(' llaves')); if (r.unlock) o.push(tr('desbloquea ') + D.characters.find(c => c.id === r.unlock).name); if (r.costume) o.push(tr('traje ') + D.costumes[r.costume].name); return o.join(' · '); }
+function rewardText(r) { const o = []; if (r.keys) o.push('+' + r.keys + tr(' llaves')); if (r.unlock) o.push(tr('desbloquea ') + D.characters.find(c => c.id === r.unlock).name + (canUnlock(r.unlock) ? '' : tr(' (versión completa)'))); if (r.costume) o.push(tr('traje ') + D.costumes[r.costume].name); return o.join(' · '); }
 
 // ---------------- input -------------
 const keys = {}; const JOY = { active: false, id: null, sx: 0, sy: 0, x: 0, y: 0 };
@@ -542,7 +553,7 @@ function achMet(c) { const runK = G.committed ? 0 : G.kills, runKar = G.committe
   if (c.fusionsTotal) return Object.keys(META.book.fused).length >= c.fusionsTotal; if (c.fusionsNormal) return D.fusions.filter(f => !f.rare && META.book.fused[f.id]).length >= c.fusionsNormal;
   if (c.allUnlocked) return D.characters.filter(ch => ch.unlock).every(ch => META.unlocked[ch.id]); return false; }
 function checkAch() { for (const a of D.achievements) if (!META.ach[a.id] && achMet(a.cond)) { const had = { ...META.unlocked }; grantAch(a.id); G.achNow.push(a.name);
-  if (a.reward.unlock && !had[a.reward.unlock]) G.unlockedNow.push(D.characters.find(c => c.id === a.reward.unlock).name); } }
+  if (a.reward.unlock && !had[a.reward.unlock] && META.unlocked[a.reward.unlock]) G.unlockedNow.push(D.characters.find(c => c.id === a.reward.unlock).name); } }
 function endRun(win) {
   if (!G || G.state === 'over') return; G.state = 'over'; G.win = win;
   track('run_end', { reason: win ? 'victory' : (G.abandoned ? 'abandon' : 'death'), minute: Math.floor(G.t / 60), seconds: Math.floor(G.t), level: G.lvl, fusions: G.fusions.length, kills: G.kills, character: G.char.id });
@@ -748,25 +759,26 @@ function renderMenu() {
   for (let y = 0; y < H; y += 64) for (let x = 0; x < W; x += 64) { ctx.globalAlpha = 0.25; ctx.drawImage(SPR.tile, x, y); ctx.globalAlpha = 1; }
   btn(W - 58, 4, 54, 14, LANG === 'es' ? 'ES | en' : 'es | EN', () => setLang(LANG === 'es' ? 'en' : 'es'), { size: 6 });
   const wl = WISHLIST_URL(); if (wl) btn(4, 4, 84, 14, tr('Wishlist en Steam'), () => { track('wishlist_click', { from: 'menu' }); PLATFORM.openLink(wl); }, { size: 5 });
-  txt('CHECK-OUT CHAOS', W / 2, 24, 16, '#f2c230', 'center'); txt(tr('v2 · Sobreviví 15 minutos de Temporada Alta'), W / 2, 36, 6, '#ccc', 'center');
+  txt('CHECK-OUT CHAOS', W / 2, 24, 16, '#f2c230', 'center'); if (!FULL()) txt(tr('DEMO'), W / 2 + 88, 18, 7, '#c58cff', 'left'); txt(tr('v2 · Sobreviví 15 minutos de Temporada Alta'), W / 2, 36, 6, '#ccc', 'center');
   txt('🔑 ' + META.keys + '   ☠ ' + META.totalKills + tr('   mejor ') + fmt(META.bestTime) + '   🏆 ' + Object.keys(META.ach).length + '/' + D.achievements.length, W / 2, 48, 7, '#ffd23f', 'center');
   const cs = D.characters, perRow = Math.ceil(cs.length / 2), cw = Math.min(64, (W - 16) / perRow - 4), chh = 66, y0 = 54;
   cs.forEach((c, i) => { const row = Math.floor(i / perRow), col = i % perRow, n = Math.min(perRow, cs.length - row * perRow);
-    const x = W / 2 + (col - (n - 1) / 2) * (cw + 4) - cw / 2, y = y0 + row * (chh + 4), un = META.unlocked[c.id], sel = META.sel === c.id;
-    buttons.push({ x, y, w: cw, h: chh, fn: () => { if (un) META.sel = c.id; else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.sel = c.id; sfx('key'); track('character_unlocked', { id: c.id, via: 'keys', price: c.price }); } saveMeta(); } });
+    const x = W / 2 + (col - (n - 1) / 2) * (cw + 4) - cw / 2, y = y0 + row * (chh + 4), un = playable(c.id), lockedFull = !un && !canUnlock(c.id), sel = MENU_PEEK ? MENU_PEEK === c.id : META.sel === c.id;
+    buttons.push({ x, y, w: cw, h: chh, fn: () => { MENU_PEEK = un ? null : c.id; if (un) META.sel = c.id; else if (lockedFull) { sfx('hurt'); } else if (META.keys >= c.price) { META.keys -= c.price; META.unlocked[c.id] = true; META.sel = c.id; sfx('key'); track('character_unlocked', { id: c.id, via: 'keys', price: c.price }); } saveMeta(); } });
     ctx.fillStyle = sel ? '#3a2f5a' : '#241c33'; ctx.fillRect(x, y, cw, chh); ctx.strokeStyle = sel ? '#f2c230' : '#554'; ctx.strokeRect(x + .5, y + .5, cw - 1, chh - 1);
     ctx.globalAlpha = un ? 1 : 0.3; drawAnim(playerKey(c.id, META.costumeSel[c.id]), x + cw / 2, y + 44, animFrame(sel, performance.now() / 1000), false, 1.25); ctx.globalAlpha = 1;
     txt(c.name.length > 12 ? c.name.slice(0, 11) + '.' : c.name, x + cw / 2, y + 54, 5, '#fff', 'center');
-    if (!un) txt('🔒 ' + c.price + '🔑', x + cw / 2, y + 63, 5, META.keys >= c.price ? '#3fdc5a' : '#ff7bc2', 'center'); else txt(D.weapons[c.weapon].name.slice(0, 14), x + cw / 2, y + 63, 4, '#f2c230', 'center'); });
-  const sc = D.characters.find(c => c.id === META.sel) || cs[0]; let y = y0 + 2 * (chh + 4) + 4;
+    if (lockedFull) txt('🔒 ' + tr('Completa'), x + cw / 2, y + 63, 5, '#c58cff', 'center'); else if (!un) txt('🔒 ' + c.price + '🔑', x + cw / 2, y + 63, 5, META.keys >= c.price ? '#3fdc5a' : '#ff7bc2', 'center'); else txt(D.weapons[c.weapon].name.slice(0, 14), x + cw / 2, y + 63, 4, '#f2c230', 'center'); });
+  const sc = D.characters.find(c => c.id === (MENU_PEEK || META.sel)) || cs[0]; let y = y0 + 2 * (chh + 4) + 4;
   txt(sc.name + ' — ' + D.weapons[sc.weapon].name + ' (' + D.weapons[sc.weapon].desc + ') · ' + sc.bonusText, W / 2, y + 6, 6, '#fff', 'center');
-  if (!META.unlocked[sc.id] && sc.unlock) txt(tr('Desbloqueo: ') + sc.unlock.text + tr(' o ') + sc.price + tr(' llaves'), W / 2, y + 15, 6, '#ff7bc2', 'center');
+  if (!playable(sc.id) && !canUnlock(sc.id)) txt(tr('Disponible en la versión completa'), W / 2, y + 15, 6, '#c58cff', 'center'); else if (!META.unlocked[sc.id] && sc.unlock) txt(tr('Desbloqueo: ') + sc.unlock.text + tr(' o ') + sc.price + tr(' llaves'), W / 2, y + 15, 6, '#ff7bc2', 'center');
   y += 20; let sx = W / 2 - 3 * 66 / 2;
   for (const s of D.shop) { const pr = shopPrice(s); btn(sx, y, 62, 16, pr == null ? s.name + ' MAX' : s.name + ' ' + pr + '🔑', () => { if (pr != null && META.keys >= pr) { META.keys -= pr; META.shop[s.id]++; saveMeta(); sfx('key'); } }, { size: 5, disabled: pr == null || META.keys < pr }); sx += 66; }
   y += 20; const own = costumesOf(META.sel), cur = META.costumeSel[META.sel];
   btn(W / 2 - 128, y, 124, 16, tr('Traje: ') + (cur ? D.costumes[cur].name : tr('Clásico')) + (own.length ? ' [T]' : tr(' (sin trajes)')), cycleCostume, { size: 5, disabled: !own.length });
   btn(W / 2 + 4, y, 124, 16, tr('Logros ') + Object.keys(META.ach).length + '/' + D.achievements.length + ' [L]', () => { screen = 'ach'; }, { size: 6 });
   btn(W / 2 - 60, y + 22, 120, 22, tr('JUGAR [Enter]'), startSelected, { hl: true, size: 10 }); btn(W / 2 + 66, y + 22, 62, 22, tr('Recetas [B]'), () => { screen = 'book'; }, { size: 6 });
+  if (!FULL()) btn(W / 2 - 128, y + 22, 62, 22, tr('Versión completa'), () => { screen = 'full'; track('full_version_click', { action: 'open_screen', from: 'menu' }); }, { size: 5 });
   const tips = D.loadingTips; txt(tr('Tip: ') + tips[Math.floor(G_now() / 6) % tips.length], W / 2, Math.min(H - 12, y + 50), 5, '#c58cff', 'center');
   txt(tr('WASD/Flechas o arrastrá · Esc/P pausa · 1-9 elegir'), W / 2, Math.min(H - 4, y + 56), 5, '#999', 'center');
 }
@@ -774,14 +786,28 @@ function renderAch() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H); txt(
   const colW = Math.min(300, (W - 20) / 2); D.achievements.forEach((a, i) => { const col = i % 2, row = Math.floor(i / 2), x = W / 2 + (col ? 4 : -colW - 4), y = 32 + row * 34, got = !!META.ach[a.id];
     ctx.fillStyle = got ? '#2f3a26' : '#241c33'; ctx.fillRect(x, y, colW, 30); txt((got ? '✔ ' : '· ') + a.name, x + 5, y + 10, 7, got ? '#3fdc5a' : '#aaa'); txt(a.desc, x + 5, y + 19, 5, '#ccc'); txt(tr('Premio: ') + rewardText(a.reward), x + 5, y + 27, 5, '#ffd23f'); });
   btn(W / 2 - 50, H - 24, 100, 18, tr('Volver [Esc]'), () => { screen = 'menu'; }); }
+let MENU_PEEK = null;
+function FULL_URL() { const u = (D.links && D.links.fullVersion) || ''; if (!u) return ''; if (PLATFORM.name === 'poki' && !(window.PokiSDK && window.PokiSDK.openExternalLink)) return ''; return u; }
+function renderFull() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, W, H);
+  for (let y = 0; y < H; y += 64) for (let x = 0; x < W; x += 64) { ctx.globalAlpha = 0.2; ctx.drawImage(SPR.tile, x, y); ctx.globalAlpha = 1; }
+  txt(tr('VERSIÓN COMPLETA'), W / 2, 30, 16, '#f2c230', 'center'); txt(tr('Estás jugando la DEMO. La versión completa incluye:'), W / 2, 50, 7, '#fff', 'center');
+  const lk = D.characters.filter(c => !inDemoSet(c.id)), cw = 40, x0 = W / 2 - (lk.length * (cw + 2)) / 2;
+  lk.forEach((c, i) => { const x = x0 + i * (cw + 2) + cw / 2; ctx.fillStyle = '#241c33'; ctx.fillRect(x - cw / 2, 60, cw, 58); drawAnim(playerKey(c.id, null), x, 102, animFrame(false, performance.now() / 1000), false, 1.1);
+    txt(c.name.length > 9 ? c.name.slice(0, 8) + '.' : c.name, x, 113, 4, playable(c.id) ? '#3fdc5a' : '#ccc', 'center'); });
+  txt('· ' + tr('11 personajes más, cada uno con su arma y bonus'), W / 2, 140, 7, '#ffd23f', 'center');
+  txt('· ' + tr('Desbloqueo con llaves y con logros'), W / 2, 154, 7, '#ffd23f', 'center');
+  txt('· ' + tr('Tu progreso de la demo se conserva'), W / 2, 168, 7, '#ffd23f', 'center');
+  const u = FULL_URL(); btn(W / 2 - 90, 190, 180, 24, u ? tr('Conseguir la versión completa') : tr('Próximamente'), () => { track('full_version_click', { action: 'link', hasUrl: !!u, from: 'full_screen' }); if (u) PLATFORM.openLink(u); }, { hl: !!u, disabled: !u, size: 7 });
+  btn(W / 2 - 50, H - 30, 100, 18, tr('Volver [Esc]'), () => { screen = 'menu'; }); }
 function WISHLIST_URL() { const u = Q.get('wishlist') || (D.links && D.links.wishlist) || ''; if (!u) return ''; if (PLATFORM.name === 'poki' && !(window.PokiSDK && window.PokiSDK.openExternalLink)) return ''; return u; }
-function startSelected() { if (!META.unlocked[META.sel]) META.sel = 'recep'; newRun(META.sel); }
+function startSelected() { if (!playable(META.sel)) META.sel = 'recep'; newRun(META.sel); }
 function togglePause() { if (!G) return; if (G.state === 'play') G.state = 'pause'; else if (G.state === 'pause') G.state = 'play'; }
 function onKey(c) {
   if (screen === 'book') { if (c === 'Escape' || c === 'KeyB' || c === 'Enter') screen = 'menu'; return; }
+  if (screen === 'full') { if (c === 'Escape' || c === 'Enter') screen = 'menu'; return; }
   if (screen === 'ach') { if (c === 'Escape' || c === 'KeyL' || c === 'Enter') screen = 'menu'; return; }
   if (screen === 'menu') { if (c === 'Enter' || c === 'Space') startSelected(); if (c === 'KeyI') setLang(LANG === 'es' ? 'en' : 'es'); if (c === 'KeyL') screen = 'ach'; if (c === 'KeyB') screen = 'book'; if (c === 'KeyT') cycleCostume();
-    const i = +c.replace('Digit', '') - 1; const ch = D && D.characters[i]; if (ch && META.unlocked[ch.id]) { META.sel = ch.id; saveMeta(); } return; }
+    const i = +c.replace('Digit', '') - 1; const ch = D && D.characters[i]; if (ch && playable(ch.id)) { META.sel = ch.id; MENU_PEEK = null; saveMeta(); } return; }
   if (!G) return;
   if (c === 'Escape' || c === 'KeyP') togglePause();
   if (G.state === 'fusion') { const i = +c.replace('Digit', '') - 1; if (G.fusionOpts[i]) doFusion(G.fusionOpts[i]); if (c === 'KeyN') { G.fusionOpts = null; G.state = 'play'; openChestNormal(); } }
@@ -795,7 +821,7 @@ function frame(ts) {
   const steps = Math.max(1, Math.round(DBG.speed)); for (let i = 0; i < steps; i++) update(raw * DBG.speed / steps);
   processClicks(); buttons = [];
   ctx.setTransform(SC, 0, 0, SC, 0, 0); ctx.imageSmoothingEnabled = false;
-  if (screen === 'menu') renderMenu(); else if (screen === 'ach') renderAch(); else if (screen === 'book') renderBook();
+  if (screen === 'menu') renderMenu(); else if (screen === 'ach') renderAch(); else if (screen === 'book') renderBook(); else if (screen === 'full') renderFull();
   else { renderWorld(); renderHUD(); if (G.state === 'levelup') renderLevelUp(); else if (G.state === 'pause') renderPause(); else if (G.state === 'fusion') renderFusion(); else if (G.state === 'over') renderSummary(); }
   renderToasts(raw);
   const active = screen === 'play' && G && G.state === 'play' && !G.victory; if (active !== PLATFORM.playing) { if (active) PLATFORM.gameplayStart(); else PLATFORM.gameplayStop(); }
@@ -808,7 +834,7 @@ function frame(ts) {
   resize(); await PLATFORM.init(); PLATFORM.loadingStart(); D = await loadData(); applyLang(); buildSprites(); buildExtraSprites(); loadMeta(); await loadSheets();
   ENE = new Pool(D.timeline.maxEnemies + 60, () => ({})); PROJ = new Pool(500, () => ({})); PICK = new Pool(700, () => ({})); FX = new Pool(500, () => ({}));
   window.CC = { get G() { return G; }, get screen() { return screen; }, get META() { return META; }, enemies: () => ENE.count(), fusionEligible: () => fusionEligible(), doFusion: id => doFusion(D.fusions.find(f => f.id === id)), openChest: () => openChest(), slotsOpen: () => slotsOpen(), WS: id => WS(G.weapons.find(w => w.id === id)), sheets: () => Object.keys(SHEET), foodCount, choose, newRun, addWeapon: id => addWeapon(id), addPassive: id => addPassive(id), recalc: () => recalcPassives(), DBG };
-  window.CC.setLang = setLang; window.CC.lang = () => LANG; window.CC.tr = tr; window.CC.D = () => D;
+  window.CC.setLang = setLang; window.CC.playable = id => playable(id); window.CC.grantAch = id => grantAch(id); window.CC.FULL = () => FULL(); window.CC.loadMeta = () => loadMeta(); window.CC.lang = () => LANG; window.CC.tr = tr; window.CC.D = () => D;
   PLATFORM.loadingFinished();
   track('session_start', { device: ANALYTICS_DEV(), origin: (window.ANALYTICS && window.ANALYTICS.origin()) || null, returning: !!(window.ANALYTICS && window.ANALYTICS.returning), persistent: STORE.persistent, viewport: innerWidth + 'x' + innerHeight });
   requestAnimationFrame(frame);

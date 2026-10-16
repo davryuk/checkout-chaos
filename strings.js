@@ -91,7 +91,19 @@ window.STRINGS = {
 "Idioma: EN": "Language: EN",
 "Wishlist en Steam": "Wishlist on Steam",
 " Nv": " Lv",
-"NV ": "LV "
+"NV ": "LV ",
+"Disponible en la versión completa": "Available in the full version",
+"Versión completa": "Full version",
+"VERSIÓN COMPLETA": "FULL VERSION",
+"Completa": "Full",
+"Estás jugando la DEMO. La versión completa incluye:": "You're playing the DEMO. The full version includes:",
+"11 personajes más, cada uno con su arma y bonus": "11 more characters, each with their own weapon and bonus",
+"Desbloqueo con llaves y con logros": "Unlock them with keys and achievements",
+"Tu progreso de la demo se conserva": "Your demo progress carries over",
+"Conseguir la versión completa": "Get the full version",
+"Próximamente": "Coming soon",
+" (versión completa)": " (full version)",
+"DEMO": "DEMO"
 }
 },
 "data": {
