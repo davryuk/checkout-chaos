@@ -1,0 +1,15 @@
+// Safe storage: localStorage when available (incognito/iframes may throw), in-memory fallback otherwise.
+(function () {
+  const mem = new Map(); let ls = null;
+  try { const k = '__cc_probe__'; window.localStorage.setItem(k, '1'); window.localStorage.removeItem(k); ls = window.localStorage; } catch (e) { ls = null; }
+  // QA debug mode (?debug=1) never touches the real save: every key gets a separate 'ccdebug.' prefix
+  let P = ''; try { if (new URLSearchParams(location.search).get('debug') === '1') P = 'ccdebug.'; } catch (e) { }
+  window.STORE = { prefix: P,
+    persistent: !!ls,
+    get(k) { k = P + k; if (ls) { try { const v = ls.getItem(k); if (v != null) return v; } catch (e) { } } return mem.has(k) ? mem.get(k) : null; },
+    set(k, v) { k = P + k; v = String(v); mem.set(k, v); if (ls) { try { ls.setItem(k, v); } catch (e) { } } },
+    remove(k) { k = P + k; mem.delete(k); if (ls) { try { ls.removeItem(k); } catch (e) { } } },
+    getJSON(k) { try { return JSON.parse(this.get(k)); } catch (e) { return null; } },
+    setJSON(k, o) { try { this.set(k, JSON.stringify(o)); } catch (e) { } }
+  };
+})();

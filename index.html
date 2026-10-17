@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<link rel="icon" type="image/png" sizes="64x64" href="branding/icon_64.png">
+<link rel="apple-touch-icon" href="branding/icon_512.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#120c18">
+<meta property="og:title" content="Check-Out Chaos">
+<meta property="og:description" content="Survive 15 minutes of High Season at the hotel from hell. Free browser demo.">
+<meta property="og:image" content="https://davryuk.github.io/checkout-chaos/branding/og-banner.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:image" content="https://davryuk.github.io/checkout-chaos/branding/og-banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<title>Check-Out Chaos</title>
+<style>html,body{margin:0;height:100%;background:#120c18;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+body{box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;outline:none}
+#rot{display:none;position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));text-align:center;color:#c58cff;font:bold 13px monospace;pointer-events:none}
+body.portrait #rot{display:block}
+html,body{height:100dvh;overscroll-behavior:none}
+body.mob{display:block;padding:0}
+body.mob canvas{position:fixed;left:0;top:0;touch-action:none}
+body.mob #rot{display:none!important}
+#sa{position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}</style>
+</head><body>
+<canvas id="c"></canvas>
+<div id="sa"></div>
+<div id="rot">⟳ Girá el teléfono · Rotate your phone</div>
+<script>addEventListener('wheel', e => e.preventDefault(), { passive: false });</script>
+<script src="storage.js"></script>
+<script src="platform.js"></script>
+<script src="analytics.js"></script>
+<script src="strings.js"></script>
+<script src="data.js"></script>
+<script src="sprites.js"></script>
+<script src="game.js"></script>
+<script src="build-info.js"></script>
+<script src="debug.js"></script>
+</body></html>
