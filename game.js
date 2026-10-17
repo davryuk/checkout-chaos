@@ -1059,7 +1059,7 @@ function wrapTxt(s, x, y, maxW, size, col, align = 'center', maxLines = 4) { ctx
   for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur);
   if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] = fitTxt(lines[maxLines - 1] + '…', maxW, size); }
   lines.forEach((l, i) => mt(fitTxt(l, maxW, size), x, y + i * Math.round(size * 1.25), size, col, align)); return lines.length * Math.round(size * 1.25); }
-function mBtn(x, y, w, h, label, fn, opt = {}) { buttons.push({ x, y, w, h, fn, css: true }); mStat('b', Math.min(w, h)); const sz = opt.size || 16;
+function mBtn(x, y, w, h, label, fn, opt = {}) { buttons.push({ x, y, w, h, fn, css: true }); if (MS) (MS.btns = MS.btns || []).push([String(label), Math.round(x + w / 2), Math.round(y + h / 2)]); mStat('b', Math.min(w, h)); const sz = opt.size || 16;
   ctx.fillStyle = opt.disabled ? '#3a3340' : (opt.hl ? '#f2c230' : (opt.bg || '#2b5fd9')); ctx.fillRect(x, y, w, h); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x, y + h - 3, w, 3);
   mt(label, x + w / 2, y + h / 2 + sz * 0.36, sz, opt.hl ? '#000' : (opt.disabled ? '#999' : '#fff'), 'center', w - 12); }
 function mBg() { ctx.fillStyle = '#1a1224'; ctx.fillRect(0, 0, MOB.vw, MOB.vh); ctx.globalAlpha = 0.18; for (let y = 0; y < MOB.vh; y += 96) for (let x = 0; x < MOB.vw; x += 96) ctx.drawImage(SPR.tile, x, y, 96, 96); ctx.globalAlpha = 1; }
@@ -1080,14 +1080,14 @@ function mTitle() { mBg(); const { vw, vh, sa } = MOB, top = mTop(), cw = vw - s
   if (FS_OK()) items.push({ label: document.fullscreenElement ? L2('Salir de pantalla completa', 'Exit fullscreen') : L2('Pantalla completa', 'Fullscreen'), fn: fsToggle });
   if (!FULL()) items.push({ label: tr('Versión completa'), fn: () => { screen = 'full'; track('full_version_click', { action: 'open_screen', from: 'menu' }); }, bg: '#6a3fb0' });
   mRow(items, sa.l + 12, y, cw - 24); }
-function gridLayout(n, x0, y0, gw, gh, minC = 120, gap = 10, scroll = false) {
-  const many = scroll && n > 8; let rows = Math.max(1, Math.min(4, n, Math.floor((gh + gap) / (150 + gap)))), ch, cols, cw;
+function gridLayout(n, x0, y0, gw, gh, minC = 120, gap = 10, scroll = false, rowH = 150) {
+  const many = scroll && n > 8; let rows = Math.max(1, Math.min(4, n, Math.floor((gh + gap) / (rowH + gap)))), ch, cols, cw;
   for (;;) { ch = Math.min(200, (gh - (rows - 1) * gap) / rows); cols = Math.ceil(n / rows); cw = (gw - (cols - 1) * gap) / cols;
     if (many || cw >= minC || rows >= n) break; const ch2 = (gh - rows * gap) / (rows + 1); if (ch2 < minC) break; rows++; }
   if (many) cw = Math.max(Math.min(cw, 170), Math.min(160, Math.max(minC, (gw - 3 * gap) / 3.6)));
   cw = Math.min(cw, 190, Math.max(ch, minC) * 1.1);
   return { rows, cols, cw, ch, gap, content: cols * (cw + gap) - gap }; }
-function mGrid(items, drawCard, area, scrollable) { const g = gridLayout(items.length, area.x, area.y, area.w, area.h, 120, 10, scrollable);
+function mGrid(items, drawCard, area, scrollable) { if (MSC.scr !== screen) { MSC.scr = screen; MSC.chars = 0; } const g = gridLayout(items.length, area.x, area.y, area.w, area.h, 120, 10, scrollable, area.rowH || 150);
   const max = Math.max(0, g.content - area.w); MSC.max = scrollable ? max : 0; if (scrollable) MSC.chars = Math.max(0, Math.min(max, MSC.chars)); const off = scrollable ? MSC.chars : 0;
   const x0 = area.x + (g.content < area.w ? (area.w - g.content) / 2 : 0) - off, y0 = area.y + Math.max(0, (area.h - (g.rows * (g.ch + g.gap) - g.gap)) / 2);
   ctx.save(); ctx.beginPath(); ctx.rect(area.x - 4, area.y - 4, area.w + 8, area.h + 8); ctx.clip();
@@ -1186,6 +1186,34 @@ function mPortrait() { const { vw, vh, sa } = MOB; const play = screen === 'play
 function mToasts(dt) { let y = MOB.sa.t + 70; const w = Math.min(300, MOB.vw * 0.42), x = MOB.vw - MOB.sa.r - 16 - w;
   for (const a of achToast) { a.t -= dt; ctx.fillStyle = 'rgba(20,10,30,.88)'; ctx.fillRect(x, y, w, 50); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, 49); mt(a.s, x + 8, y + 20, 16, '#ffd23f', 'left', w - 16); mt(a.sub || '', x + 8, y + 40, 16, '#ddd', 'left', w - 16); y += 56; }
   achToast = achToast.filter(a => a.t > 0); }
+// mobile: remaining screens (achievements, recipe book, upgrades shop, full-version page, Check-In guest select)
+function mFullArea() { const { vw, vh, sa } = MOB, top = mTop() + 52; return { x: sa.l + 12, y: top, w: vw - sa.l - sa.r - 24, h: vh - sa.b - top - 16 }; }
+function mHeader(title, back, right) { const { vw } = MOB, top = mTop(); mBack(back); mt(title, vw / 2, top + 29, 20, '#f2c230', 'center', vw - 260); if (right) mt(right, vw - MOB.sa.r - 16, top + 28, 16, '#ffd23f', 'right', 120); }
+function mCardText(lines, x, y, w, h) { let yy = y; for (const [s, col, max] of lines) { if (!s) continue; if (yy > y + h - 16) break; yy += wrapTxt(s, x + w / 2, yy, w - 14, 16, col, 'center', Math.max(1, Math.min(max || 3, Math.floor((y + h - yy) / 20)))) + 4; } }
+function mAch() { mBg(); mHeader(tr('LOGROS'), 'menu', '🏆 ' + Object.keys(META.ach).length + '/' + D.achievements.length);
+  mGrid(D.achievements.map(a => ({ a, fn: () => { } })), (it, x, y, w, h) => { const a = it.a, got = !!META.ach[a.id]; ctx.fillStyle = got ? '#2f3a26' : '#241c33'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = got ? '#3fdc5a' : '#554'; ctx.lineWidth = got ? 2 : 1; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    mt(got ? '✔' : '·', x + w / 2, y + 22, 18, got ? '#3fdc5a' : '#888', 'center'); mCardText([[a.name, got ? '#3fdc5a' : '#fff', 2], [a.desc, '#ccc', 3], [tr('Premio: ') + rewardText(a.reward), '#ffd23f', 3]], x, y + 36, w, h - 40); }, Object.assign(mFullArea(), { rowH: 200 }), true); }
+function mBook() { mBg(); mHeader(tr('LIBRO DE RECETAS ').trim(), 'menu', Object.keys(META.book.fused).length + '/' + D.fusions.length);
+  mGrid(D.fusions.map(f => ({ f, fn: () => { } })), (it, x, y, w, h) => { const f = it.f, s = bookState(f), known = s.fused || (s.wHalf && s.pHalf);
+    ctx.fillStyle = s.fused ? '#2a1740' : '#1f1830'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = s.fused ? '#ffd23f' : (f.rare ? '#c58cff' : '#554'); ctx.lineWidth = s.fused ? 2 : 1; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    if (known) drawIcon(f.icon, x + w / 2 - 20, y + 8, 40); else { const c = SHEET.ui_receta_silueta ? 'ui_receta_silueta' : null; if (c) drawIcon(c, x + w / 2 - 20, y + 4, 40); else mt('?', x + w / 2, y + 38, 28, '#555', 'center'); }
+    const r1 = s.wHalf ? f.recipe.w.map(id => D.weapons[id].evo.name).join(' + ') : (f.rare ? tr('Requiere dos') + ' ' + tr('armas maestras') : '???'), r2 = f.recipe.p ? (s.pHalf ? '+ ' + D.passives[f.recipe.p].name : '+ ???') : '';
+    mCardText([[known ? f.name : '???', s.fused ? '#ffd23f' : '#fff', 2], [r1, '#c58cff', 3], [r2, '#c58cff', 2], [s.fused ? f.desc : '', '#ccc', 3]], x, y + 60, w, h - 64); }, Object.assign(mFullArea(), { rowH: 200 }), true); }
+function mShop() { mBg(); mHeader(L2('MEJORAS', 'UPGRADES'), 'menu', '🔑 ' + META.keys);
+  mGrid(D.shop.map(s => ({ s, fn: () => { const pr = shopPrice(s); if (pr != null && META.keys >= pr) { META.keys -= pr; META.shop[s.id]++; saveMeta(); sfx('key'); } else sfx('hurt'); } })), (it, x, y, w, h) => { const s = it.s, pr = shopPrice(s), lv = META.shop[s.id] || 0, can = pr != null && META.keys >= pr;
+    ctx.fillStyle = '#241c33'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = can ? '#f2c230' : '#554'; ctx.lineWidth = can ? 2 : 1; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    mCardText([[s.name, '#fff', 2], [L2('Nivel ', 'Level ') + lv + '/' + s.price.length, '#ccc', 1]], x, y + 22, w, h - 70);
+    ctx.fillStyle = pr == null ? '#3a3340' : (can ? '#f2c230' : '#3a3340'); ctx.fillRect(x + 8, y + h - 52, w - 16, 44); mt(pr == null ? 'MAX' : pr + ' 🔑', x + w / 2, y + h - 24, 18, can ? '#000' : '#999', 'center', w - 24); }, mFullArea(), true); }
+function mFull() { mBg(); mHeader(tr('VERSIÓN COMPLETA'), 'menu'); const S = mSplit(), lk = D.characters.filter(c => !inDemoSet(c.id));
+  mGrid(lk.map(c => ({ c, fn: () => { } })), (it, x, y, w, h) => { const c = it.c; ctx.fillStyle = '#241c33'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#554'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+    const s = Math.max(1.5, Math.min((h - 44) / 34, (w - 16) / 32)); drawAnim(playerKey(c.id, null), x + w / 2, y + 8 + 32 * s, animFrame(false, performance.now() / 1000), false, s); mt(c.name, x + w / 2, y + h - 12, 16, playable(c.id) ? '#3fdc5a' : '#fff', 'center', w - 8); }, S.grid, true);
+  const I = S.info; let y = I.y + 16; for (const l of [tr('11 personajes más, cada uno con su arma y bonus'), tr('4 niveles más, rescates y logros para desbloquear personajes'), tr('Tu progreso de la demo se conserva')]) { if (y > I.y + I.h - 80) break; y += wrapTxt('· ' + l, I.x, y, I.w, 16, '#ffd23f', 'left', MOB.portrait ? 2 : 3) + 6; }
+  const u = FULL_URL(); mCTA(I, u ? L2('Conseguir', 'Get it') + ' ▶' : tr('Próximamente'), () => { track('full_version_click', { action: 'link', hasUrl: !!u, from: 'full_screen' }); if (u) PLATFORM.openLink(u); }, { hl: !!u, disabled: !u }); }
+function mGuests() { mBg(); mHeader(tr('ELEGÍ HUÉSPED'), 'levels', 'Check-In'); const S = mSplit(), gs = D.checkin.guests;
+  mGrid(gs.map((g, i) => ({ g, fn: () => { GUEST_SEL = i; } })), (it, x, y, w, h) => { const g = it.g, sel = gs[GUEST_SEL] === g; ctx.fillStyle = sel ? '#2a3a5a' : '#1a1f33'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = sel ? '#7ae8ff' : '#445'; ctx.lineWidth = sel ? 3 : 1; ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    const s = Math.max(1.5, Math.min((h - 44) / 34, (w - 16) / 32)); drawAnim('pl_' + g.id, x + w / 2, y + 8 + 32 * s, animFrame(sel, performance.now() / 1000), false, s); mt(g.name, x + w / 2, y + h - 12, 16, '#fff', 'center', w - 8); }, Object.assign(S.grid, { rowH: 190 }), false);
+  const g = gs[GUEST_SEL] || gs[0], I = S.info; let y = I.y + 20; if (SHEET[g.portrait]) ctx.drawImage(SHEET[g.portrait].img, I.x, y - 16, 48, 48); mt(g.name, I.x + (SHEET[g.portrait] ? 56 : 0), y + 12, 20, '#7ae8ff', 'left', I.w - 56); y += 44;
+  wrapTxt(tr(g.bonusText), I.x, y, I.w, 16, '#ddd', 'left', MOB.portrait ? 2 : 5); mCTA(I, L2('Jugar', 'Play') + ' ▶', () => newRun(g.id, 'checkin')); }
 function mobileFrame(raw) { MS = { screen, minText: 1e9, minTarget: 1e9 }; const d = MOB.dpr;
   if (screen === 'play' && G && G.state === 'play' && MOB.portrait && !MOB.portraitOk) { G.state = 'pause'; G.portraitPause = true; }
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -1195,13 +1223,14 @@ function mobileFrame(raw) { MS = { screen, minText: 1e9, minTarget: 1e9 }; const
   if (screen === 'menu') mTitle(); else if (screen === 'chars') mChars(); else if (screen === 'levels') mLevels();
   else if (screen === 'play' && G) { world(); renderWorld(); if (LV.id !== 'lobby') renderLevelTop(G.camX, G.camY); ctx.restore(); ui(); mHUD();
     if (G.state === 'levelup') mLevelUp(); else if (G.state === 'fusion') mFusion(); else if (G.state === 'over') mSummary(); else if (G.state === 'pause' && !G.portraitPause) mPause(); if (G.state === 'play' || G.portraitPause) mStick(); }
-  else { const fb = { ach: renderAch, book: renderBook, full: renderFull, guests: renderGuests, shop: renderMenu }[screen]; if (fb) { world(); fb(); ctx.restore(); ui(); mBack(screen === 'guests' ? 'levels' : 'menu'); MS.fallback = true; } }
+  else { const m2 = { ach: mAch, book: mBook, shop: mShop, full: mFull, guests: mGuests }[screen]; if (m2) m2(); }
   ui(); mToasts(raw); if (MOB.portrait && !MOB.portraitOk) mPortrait(); BTN_CSS = false;
   MS.gs = MOB.gs; MS.W = W; MS.vw = MOB.vw; MS.vh = MOB.vh; window.__ccMobileStats = MS; }
 function mDown(e, p) { if (screen === 'play' && G && G.state === 'play' && stickZone(p) && !hitBtn(p)) { const [sx, sy] = stickCenter(p.cx, p.cy); Object.assign(JOY, { active: true, id: e.pointerId, sx, sy, x: p.cx, y: p.cy }); try { cv.setPointerCapture(e.pointerId); } catch (er) { } return; }
   TAP = { id: e.pointerId, p, moved: false, s0: MSC.chars }; }
 function mMove(e, p) { if (JOY.active && e.pointerId === JOY.id) { JOY.x = p.cx; JOY.y = p.cy; return; } if (TAP && TAP.id === e.pointerId) { const dx = p.cx - TAP.p.cx, dy = p.cy - TAP.p.cy; if (Math.abs(dx) > 10 || Math.abs(dy) > 10) TAP.moved = true; if (TAP.moved && MSC.max > 0) MSC.chars = Math.max(0, Math.min(MSC.max, TAP.s0 - dx)); } }
 function mUp(e) { if (TAP && TAP.id === e.pointerId) { if (!TAP.moved) clickQ.push(TAP.p); TAP = null; } }
+window.__ccScroll = () => ({ v: Math.round(MSC.chars), max: Math.round(MSC.max) });
 const MOBILE_API = { hasChars: true, get mob() { return MOB; }, portraitOk: () => { MOB.portraitOk = true; if (G && G.portraitPause) { G.portraitPause = false; if (G.state === 'pause') G.state = 'play'; } } };
 
 let last = 0;
